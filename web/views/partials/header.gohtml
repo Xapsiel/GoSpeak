@@ -1,0 +1,12 @@
+{{define "partials/header"}}
+    <header class="bg-primary text-white p-3">
+        <div class="container d-flex justify-content-between">
+            <h1>{{.Name}}</h1>
+            <nav>
+                <a href="http://{{.Domain}}/" class="text-white mx-3">Главная</a>
+                <a href="http://{{.Domain}}/conference" class="text-white mx-3">Конференции</a>
+                <a href="http://{{.Domain}}/sign-in" class="text-white mx-3">Вход</a>
+            </nav>
+        </div>
+    </header>
+{{end}}

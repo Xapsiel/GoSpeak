@@ -11,6 +11,7 @@ import (
 	"GoSpeak/internal/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 )
 
 func main() {
@@ -31,8 +32,12 @@ func main() {
 	repos := repository.NewRepository(db)
 	slog.Info("initializing repos")
 	services := service.NewService(*repos)
+	engine := html.New("./web/views", ".gohtml")
+	engine.Reload(!config.IsProduction)
 	router := http.NewRouter(*services, config.HostConfig)
-	app := fiber.New(fiber.Config{})
+	app := fiber.New(fiber.Config{
+		Views: engine,
+	})
 
 	router.Routes(app)
 	go router.HandleWebSocketMessage()

@@ -11,7 +11,7 @@ COPY . .
 RUN go mod download
 
 # Собираем приложение
-RUN go build -o main .
+RUN go build -o main ./cmd
 
 # Используем минимальный образ для финального контейнера
 FROM alpine:latest

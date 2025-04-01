@@ -9,6 +9,10 @@ type ParticipantService struct {
 	repo repository.Participant
 }
 
+func (s *ParticipantService) RemoveFromConference(id int64) error {
+	return s.repo.RemoveFromConference(id)
+}
+
 func NewParticipantService(repo repository.Participant) *ParticipantService {
 	return &ParticipantService{
 		repo: repo,

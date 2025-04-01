@@ -1,0 +1,58 @@
+/* Контейнер формы */
+.auth-form {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+    margin: 50px auto;
+    border: 3px solid #28a745;
+}
+
+/* Заголовок */
+.auth-form h2 {
+    color: #28a745;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* Поля формы */
+.auth-form .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.auth-form label {
+    font-weight: bold;
+    color: #555;
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+/* Кнопки */
+#sign-inButton, #sign-upButton {
+    background: #28a745;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#sign-inButton:hover, #sign-upButton:hover {
+    background: #218838;
+}
+
+.auth-form p {
+    margin-top: 15px;
+}

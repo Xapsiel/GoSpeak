@@ -43,3 +43,10 @@ func (r *ParticipantRepository) AddToConference(u int64, conf *model.Conference)
 	return nil
 
 }
+func (r *ParticipantRepository) RemoveFromConference(id int64) error {
+	query :=
+		`DELETE FROM participants WHERE user_id = $1;`
+	_, err := r.db.Exec(query, id)
+	return err
+
+}

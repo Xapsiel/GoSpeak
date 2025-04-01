@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"GoSpeak/internal/config"
+	"GoSpeak/internal/model"
 	"GoSpeak/internal/service"
 
 	"github.com/gofiber/fiber/v2"
@@ -18,44 +19,54 @@ const (
 
 type Router struct {
 	service service.Service
-	Domain  string
+	cfg     config.HostConfig
 	*WebSocket
 }
 type WebSocket struct {
 	mu        *sync.Mutex
-	clients   map[*websocket.Conn]bool
-	broadcast chan []byte
+	clients   map[*websocket.Conn]model.Participant
+	broadcast chan Response
+}
+type Response struct {
+	User_id      int64                   `json:"user_id"`
+	Confrence_id string                  `json:"confrence_id"`
+	Response     model.WebSocketResponse `json:"response"`
 }
 
 func NewRouter(service service.Service, cfg config.HostConfig) *Router {
 	return &Router{service: service,
-		Domain: cfg.Domain,
+		cfg: cfg,
 		WebSocket: &WebSocket{
 			mu:        &sync.Mutex{},
-			clients:   make(map[*websocket.Conn]bool),
-			broadcast: make(chan []byte),
+			clients:   make(map[*websocket.Conn]model.Participant),
+			broadcast: make(chan Response),
 		},
 	}
 }
 
 func (r *Router) Routes(app fiber.Router) {
 	app.Static("assets", "web/assets")
+
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
+		AllowHeaders:     "Origin, Content-Type, Accept, Content-Length, Accept-Language, Accept-Encoding, Connection, Access-Control-Allow-Origin",
+		AllowMethods:     "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS",
 		AllowCredentials: false,
 	}))
 	app.Use(logger.New(logger.Config{
 		Format: "[${ip}]:${port} ${status} - ${method} ${path} - ${ua}\\n\n",
 	}))
 
-	// Роуты аутентификации
+	app.Get("/", r.IndexHandler)
+	app.Get("/sign-in", r.RenderSignIn)
+	app.Get("/sign-up", r.RenderSignUp)
+	app.Get("/conference", r.RenderConference)
 	auth := app.Group("/auth")
 	user := app.Group("/user")
 	conference := app.Group("/conference")
 	auth.Post("/sign-up", r.PostSignUpHandler)
 	auth.Post("/sign-in", r.PostSignInHandler)
 	user.Get("/", r.GetUserHandler)
-	app.Get("/", r.IndexHandler)
 	conference.Use(r.JWTMiddleware)
 	conference.Post("/create", r.CreateConferenceHandler)
 	conference.Get("/join", r.JoinConferenceHandler)
@@ -66,5 +77,5 @@ func (r *Router) Routes(app fiber.Router) {
 }
 
 func (r *Router) NewPage() *Page {
-	return &Page{Domain: r.Domain}
+	return &Page{Domain: r.cfg.Domain, Name: r.cfg.Name}
 }

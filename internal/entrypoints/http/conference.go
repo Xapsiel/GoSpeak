@@ -6,10 +6,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-type JoinConferenceResponse struct {
+type ConferenceResponse struct {
 	*Page
-	*model.User
-	*model.Conference
 }
 
 func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
@@ -48,4 +46,10 @@ func (r *Router) CreateConferenceHandler(c *fiber.Ctx) error {
 		"join_url":   conf.JoinURL,
 		"creater_id": conf.CreaterID,
 	})
+}
+
+func (r *Router) RenderConference(c *fiber.Ctx) error {
+	resp := ConferenceResponse{Page: r.NewPage()}
+	resp.Page.Title = "Видеоконференция"
+	return c.Render("conference", resp, "layouts/main")
 }

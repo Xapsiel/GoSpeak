@@ -36,7 +36,6 @@ func (r *Router) PostSignInHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// Сохраняем JWT в локальные данные для последующего использования
 	c.Locals("jwt_token", jwt)
 
 	return c.JSON(SignInPostResponse{
@@ -45,14 +44,14 @@ func (r *Router) PostSignInHandler(c *fiber.Ctx) error {
 	})
 }
 
-func (r *Router) GetSignInHandler(c *fiber.Ctx) error {
+func (r *Router) RenderSignIn(c *fiber.Ctx) error {
 	resp := &SignInResponse{
 		Page: r.NewPage(),
 	}
+	resp.Page.Title = "Авторизация"
 	return c.Render("sign-in", resp, "layouts/main")
 }
 func (r *Router) JWTMiddleware(c *fiber.Ctx) error {
-	// Извлекаем токен из локальных данных
 	tokenStr := c.Get("Authorization")
 	if len(tokenStr) > 7 {
 		tokenStr = tokenStr[7:]
@@ -64,7 +63,6 @@ func (r *Router) JWTMiddleware(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusUnauthorized, "Missing token")
 	}
 
-	// Парсим и проверяем JWT
 	u, err := r.service.User.ParseJWT(tokenStr) // Преобразуем в строку
 	if err != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "Invalid token")

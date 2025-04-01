@@ -1,0 +1,43 @@
+<link rel="stylesheet" href="/assets/src/styles/conference.css">
+
+<script type="module" src="/assets/src/scripts/conference.js"></script>
+
+<main class="container mt-5">
+    <section id="createConference" class="conference-create d-none">
+        <div class="card">
+            <div class="card-body text-center">
+                <h2>Создать новую конференцию</h2>
+
+                <form id="createConferenceForm">
+                    <div class="form-group">
+                        <label for="title">Название конференции:</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Описание конференции:</label>
+                        <input type="text" class="form-control" id="description" name="description" >
+                    </div>
+                    <button type="submit" id="createConferenceButton" >Создать конференцию</button>
+                </form>
+
+            </div>
+        </div>
+    </section>
+    <section id="conferenceSection" class="conference d-none">
+        <h2>Видеоконференция</h2>
+        <div class="d-flex">
+            <div class="video-section">
+                <video id="localVideo" class="w-100" autoplay muted></video>
+                <video id="remoteVideo" class="w-100" autoplay></video>
+                <button id="endCallButton" class="btn btn-danger btn-block mt-3">Завершить звонок</button>
+            </div>
+            <div class="chat-section ml-4">
+                <h3>Чат</h3>
+                <div id="chatMessages" class="chat-messages mb-3" style="height: 300px; overflow-y: auto;"></div>
+                <input type="text" id="chatInput" class="form-control" placeholder="Введите сообщение">
+                <button id="sendMessage" class="btn btn-primary btn-block mt-2">Отправить</button>
+            </div>
+        </div>
+    </section>
+</main>

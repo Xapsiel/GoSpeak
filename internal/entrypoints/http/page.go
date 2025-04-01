@@ -5,4 +5,5 @@ type Page struct {
 	Title      string
 	HTTPStatus int
 	Error      string
+	Name       string
 }

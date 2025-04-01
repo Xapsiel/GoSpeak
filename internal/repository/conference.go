@@ -51,6 +51,7 @@ func (r *ConferenceRepository) GetConference(join_url string) (*model.Conference
 	if err != nil {
 		return nil, fmt.Errorf("Error getting conference: %v", err)
 	}
+	conf.JoinURL = join_url
 	return &conf, nil
 
 }

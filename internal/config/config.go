@@ -9,8 +9,10 @@ type Config struct {
 	HostConfig     `yaml:"host"`
 }
 type HostConfig struct {
-	Port   string `yaml:"port"` //`env:"PORT" env-default:"9000"`
-	Domain string `yaml:"domain"`
+	Port         string `yaml:"port"` //`env:"PORT" env-default:"9000"`
+	Domain       string `yaml:"domain"`
+	Name         string `yaml:"name"`
+	IsProduction bool   `yaml:"is_production"`
 }
 type DatabaseConfig struct {
 	Host     string `yaml:"host"`

@@ -29,10 +29,11 @@ func (r *Router) PostSignUpHandler(c *fiber.Ctx) error {
 	}
 	return c.JSON(SignUpPostResponse{})
 }
-func (r *Router) GetSignUpHandler(c *fiber.Ctx) error {
+func (r *Router) RenderSignUp(c *fiber.Ctx) error {
 	resp := &SignUpResponse{
 		Page: r.NewPage(),
 	}
+	resp.Page.Title = "Регистрация"
 	return c.Render("sign-up", resp, "layouts/main")
 
 }
