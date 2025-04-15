@@ -22,6 +22,8 @@ const conference = {
 };
 
 let ws = null;
+let pendingCandidates = [];
+
 function createPeerConnection() {
     const configuration = {
         iceServers: [
@@ -56,7 +58,7 @@ function createPeerConnection() {
         };
 
         localPeerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
+            if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: "send_ice_candidate",
                     candidate: event.candidate,
@@ -65,7 +67,7 @@ function createPeerConnection() {
         };
 
         remotePeerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
+            if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: "send_ice_candidate",
                     candidate: event.candidate,
@@ -86,46 +88,48 @@ function createPeerConnection() {
     }
 }
 
+function createOffer() {
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(localStream => {
+            const localVideo = document.getElementById("localVideo");
+            localVideo.srcObject = localStream;
 
-async function createOffer() {
+            localStream.getTracks().forEach(track => {
+                localPeerConnection.addTrack(track, localStream);
+            });
 
-    const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    const localVideo = document.getElementById("localVideo");
-    localVideo.srcObject = localStream;
-
-    localStream.getTracks().forEach((track) => {
-        localPeerConnection.addTrack(track, localStream);
-    });
-
-    const offer = await localPeerConnection.createOffer();
-    await localPeerConnection.setLocalDescription(offer);
-
-    ws.send(JSON.stringify({
-        type: "send_offer",
-        offer: offer,
-    }));
-}
-async function getUser() {
-    try {
-        const response = await axiosInstance.get("/user/", {
-            headers: { "Authorization": `Bearer ${auth.token}` },
-        });
-        return response.data;
-    } catch (error) {
-        return null;
-    }
+            return localPeerConnection.createOffer();
+        })
+        .then(offer => localPeerConnection.setLocalDescription(offer))
+        .then(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "send_offer",
+                    offer: localPeerConnection.localDescription,
+                }));
+            }
+        })
+        .catch(error => console.error("Error in createOffer:", error));
 }
 
-async function initializeUser() {
+function getUser() {
+    return axiosInstance.get("/user/", {
+        headers: { "Authorization": `Bearer ${auth.token}` },
+    }).then(response => response.data)
+        .catch(() => null);
+}
+
+function initializeUser() {
     if (auth.token) {
-        const user = await getUser();
-        if (user) {
-            auth.user = user;
-            window.localStorage.setItem("user", JSON.stringify(user));
-        }
+        return getUser().then(user => {
+            if (user) {
+                auth.user = user;
+                window.localStorage.setItem("user", JSON.stringify(user));
+            }
+        });
     }
+    return Promise.resolve();
 }
-
 
 function setupWebSocket() {
     if (!conference.id) {
@@ -137,11 +141,12 @@ function setupWebSocket() {
 
     ws.onopen = () => {
         console.log("✅ WebSocket соединение установлено.");
-        ws.send(JSON.stringify({ type: "join_conference",
+        ws.send(JSON.stringify({
+            type: "join_conference",
             user_id: auth.user?.user_id,
             creater_id: conference.creater_id,
             conference_id: conference.id,
-        } ));
+        }));
     };
 
     ws.onmessage = (event) => {
@@ -155,17 +160,16 @@ function setupWebSocket() {
 }
 
 function handleWebSocketMessage(data) {
-    console.log(data)
     switch (data.response.type) {
         case "user_joined":
             handleUserJoined(data);
-            break; //обработал
+            break;
         case "user_left":
             handleUserLeft(data);
-            break; //обработано
+            break;
         case "new_message":
             handleNewMessage(data);
-            break;//делаю
+            break;
         case "receive_offer":
             handleReceiveOffer(data);
             break;
@@ -197,75 +201,67 @@ function handleNewMessage(data) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-
-async function handleReceiveAnswer(data) {
+function handleReceiveAnswer(data) {
     try {
-        console.log("Received answer:", data);
+        if (!data.response?.data) throw new Error("Invalid answer format");
 
-        if (!data.response || !data.response.data) {
-            throw new Error("Invalid answer format");
-        }
-
-        const answer = new RTCSessionDescription(data.response.data);
-        console.log("Parsed answer:", answer);
-
-        await localPeerConnection.setRemoteDescription(answer);
-        console.log("Answer set successfully");
+        const answer = new RTCSessionDescription(data.response.data.answer);
+        localPeerConnection.setRemoteDescription(answer)
+            .then(() => console.log("Answer set successfully"))
+            .catch(e => console.error("Error setting answer:", e));
     } catch (e) {
         console.error("Error handling answer:", e);
     }
 }
+var ts = (new Date()).getTime();
 
-let pendingCandidates = [];
-
-async function handleReceiveIceCandidate(data) {
+function handleReceiveIceCandidate(data) {
     try {
-        console.log("Received ICE candidate:", data);
-
-        if (!data.response || !data.response.data) {
-            throw new Error("Invalid ICE candidate format");
-        }
+        if (!data.response?.data) throw new Error("Invalid ICE candidate format");
 
         const candidate = new RTCIceCandidate(data.response.data);
-        console.log("Parsed ICE candidate:", candidate);
 
-        if (!remotePeerConnection.remoteDescription || !remotePeerConnection.remoteDescription.type) {
-            console.warn("Remote description not set. Storing ICE candidate...");
+        if (!remotePeerConnection.remoteDescription?.type) {
             pendingCandidates.push(candidate);
             return;
         }
 
-        await remotePeerConnection.addIceCandidate(candidate);
-        console.log("ICE candidate added successfully");
+        remotePeerConnection.addIceCandidate(candidate)
+            .then(() => console.log("ICE candidate added successfully"))
+            .catch(e => console.error("Error adding ICE candidate:", e));
     } catch (e) {
-        console.error("Error adding ICE candidate:", e);
+        console.error("Error processing ICE candidate:", e);
     }
 }
 
-async function handleReceiveOffer(data) {
+function handleReceiveOffer(data) {
     const offer = new RTCSessionDescription(data.response.data);
-    await remotePeerConnection.setRemoteDescription(offer);
 
-    console.log("Applying pending ICE candidates...");
-    while (pendingCandidates.length) {
-        await remotePeerConnection.addIceCandidate(pendingCandidates.shift());
-    }
+    remotePeerConnection.setRemoteDescription(offer)
+        .then(() => remotePeerConnection.createAnswer())
+        .then(answer => remotePeerConnection.setLocalDescription(answer))
 
-    const answer = await remotePeerConnection.createAnswer();
-    await remotePeerConnection.setLocalDescription(answer);
-
-    ws.send(JSON.stringify({
-        type: "send_answer",
-        answer: answer,
-    }));
+        .then(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "send_answer",
+                    answer: remotePeerConnection.localDescription,
+                }));
+            }
+        })
+        .then(() => {
+            pendingCandidates.forEach(candidate => {
+                remotePeerConnection.addIceCandidate(candidate)
+                    .catch(e => console.error("Error adding pending candidate:", e));
+            });
+            pendingCandidates = [];
+        })
+        .catch(error => console.error("Error in handleReceiveOffer:", error));
 }
-
 
 function sendMessage() {
     const input = document.getElementById("chatInput");
-    if (!input.value.trim() || !auth.user || !ws || ws.readyState !== WebSocket.OPEN) {
-        return;
-    }
+    if (!input.value.trim() || !auth.user || !ws || ws.readyState !== WebSocket.OPEN) return;
 
     const messageData = {
         type: "chat_message",
@@ -274,6 +270,7 @@ function sendMessage() {
         content: input.value,
         sent_at: new Date().toISOString(),
     };
+
     const chatMessages = document.getElementById("chatMessages");
     const message = document.createElement("div");
     message.classList.add("chat-message");
@@ -284,6 +281,7 @@ function sendMessage() {
     input.value = "";
 }
 
+// Event listeners
 document.getElementById("sendMessage").addEventListener("click", sendMessage);
 document.getElementById("chatInput").addEventListener("keypress", (event) => {
     if (event.key === "Enter") {
@@ -297,71 +295,61 @@ document.getElementById("endCallButton").addEventListener("click", () => {
     alert("Звонок завершён.");
 });
 
-document.addEventListener("DOMContentLoaded", async () => {
+// Initialization
+document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
 
     const createSection = document.getElementById("createConference");
     const conferenceSection = document.getElementById("conferenceSection");
-    await initializeUser()
-    console.log(auth.user,joinUrl)
-    if (joinUrl) {
-        try {
-            const response = await axiosInstance.get(
-                `/conference/join?join_url=${joinUrl}`
-                ,
-                { headers: { Authorization: `Bearer ${auth.token}` } }
-            );
 
-            if (response.data) {
-                conferenceSection?.classList.remove("d-none");
-                conference.id = response.data.conference_id;
-                conference.creater_id = response.data.creator_id;
-                conference.join_url = response.data.join_url;
-                console.log(conference)
-                setupWebSocket();
-                createPeerConnection();
-                createOffer()
-            }
-        } catch (error) {
-            console.error("Ошибка при присоединении:", error);
+    initializeUser().then(() => {
+        console.log(auth.user, joinUrl);
+
+        if (joinUrl) {
+            axiosInstance.get(`/conference/join?join_url=${joinUrl}`, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            }).then(response => {
+                if (response.data) {
+                    conferenceSection?.classList.remove("d-none");
+                    conference.id = response.data.conference_id;
+                    conference.creater_id = response.data.creator_id;
+                    conference.join_url = response.data.join_url;
+                    console.log(conference);
+                    setupWebSocket();
+                    createPeerConnection();
+                    createOffer();
+                }
+            }).catch(error => {
+                console.error("Ошибка при присоединении:", error);
+            });
+        } else {
+            createSection?.classList.remove("d-none");
         }
-    } else {
-        createSection?.classList.remove("d-none");
-    }
+    });
 
     document.getElementById('createConferenceButton').addEventListener('click', () => {
         if (elements.createConferenceForm) {
-            console.log(1);
-            elements.createConferenceForm.addEventListener("submit", async (event) => {
+            elements.createConferenceForm.addEventListener("submit", (event) => {
                 event.preventDefault();
                 const title = elements.createConferenceForm.querySelector("#title").value;
                 const description = elements.createConferenceForm.querySelector("#description").value;
                 const creater_id = auth.user.user_id;
-                console.log(title, description, creater_id);
-                try {
-                    const response = await axiosInstance.post("/conference/create", { title, description, creater_id }, {
-                        headers: {
-                            Authorization: `Bearer ${auth.token}`
-                        }
-                    });
 
-                    if (response.data && response.data.join_url) {
-                        const joinUrl = response.data.join_url;
-
+                axiosInstance.post("/conference/create", { title, description, creater_id }, {
+                    headers: { Authorization: `Bearer ${auth.token}` }
+                }).then(response => {
+                    if (response.data?.join_url) {
                         const newUrl = new URL(window.location.href);
-                        newUrl.searchParams.set('join_url', joinUrl);
-
+                        newUrl.searchParams.set('join_url', response.data.join_url);
                         window.location.href = newUrl.toString();
                     } else {
                         console.error("Ошибка: join_url отсутствует в ответе сервера");
                     }
-
-                } catch (error) {
+                }).catch(error => {
                     console.error(error);
-                }
+                });
             });
         }
     });
 });
-
