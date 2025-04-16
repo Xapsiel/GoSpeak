@@ -28,9 +28,11 @@ type WebSocket struct {
 	broadcast chan Response
 }
 type Response struct {
-	User_id      int64                   `json:"user_id"`
-	Confrence_id string                  `json:"confrence_id"`
-	Response     model.WebSocketResponse `json:"response"`
+	User_id       int64                   `json:"user_id"`
+	Conference_id string                  `json:"confrence_id"`
+	Response      model.WebSocketResponse `json:"response"`
+	Target        int64                   `json:"target,omitempty"`
+	Sender        int64                   `json:"sender,omitempty"`
 }
 
 func NewRouter(service service.Service, cfg config.HostConfig) *Router {
@@ -48,10 +50,11 @@ func (r *Router) Routes(app fiber.Router) {
 	app.Static("assets", "web/assets")
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
-		AllowHeaders:     "Origin, Content-Type, Accept, Content-Length, Accept-Language, Accept-Encoding, Connection, Access-Control-Allow-Origin",
-		AllowMethods:     "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS",
-		AllowCredentials: false,
+		AllowOrigins:     "http://localhost:3000, http://127.0.0.1:3000",
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowCredentials: true,
+		ExposeHeaders:    "Content-Length",
 	}))
 	app.Use(logger.New(logger.Config{
 		Format: "[${ip}]:${port} ${status} - ${method} ${path} - ${ua}\\n\n",

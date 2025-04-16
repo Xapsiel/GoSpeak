@@ -9,6 +9,11 @@ type ParticipantService struct {
 	repo repository.Participant
 }
 
+func (s *ParticipantService) GetConferenceParticipants(id string) ([]model.Participant, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (s *ParticipantService) RemoveFromConference(id int64) error {
 	return s.repo.RemoveFromConference(id)
 }

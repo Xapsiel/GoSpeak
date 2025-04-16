@@ -47,6 +47,8 @@ func (r *Router) HandleWebSocketConnection(c *websocket.Conn) {
 			slog.Error(err.Error())
 			break
 		}
+		response.TargetUserId = message.TargetUserId
+
 		switch message.Type {
 		case "join_conference":
 			response.Type = "user_joined"
@@ -87,7 +89,6 @@ func (r *Router) HandleWebSocketConnection(c *websocket.Conn) {
 				continue
 			}
 			response.Data = *m
-
 			log.Printf("recv: %s", msg)
 		case "send_offer":
 			response.Type = "receive_offer"
@@ -98,7 +99,13 @@ func (r *Router) HandleWebSocketConnection(c *websocket.Conn) {
 				slog.Error(err.Error())
 				break
 			}
-			response.Data = offer.Offer
+			response.Data = struct {
+				Sender_id int64       `json:"sender_id"`
+				Offer     interface{} `json:"offer"`
+			}{
+				message.TargetUserId,
+				offer.Offer,
+			}
 
 		case "send_answer":
 			response.Type = "receive_answer"
@@ -120,13 +127,19 @@ func (r *Router) HandleWebSocketConnection(c *websocket.Conn) {
 				slog.Error(err.Error())
 				break
 			}
-			response.Data = ice.Candidate
+			response.Data = struct {
+				Candidate interface{} `json:"candidate"`
+				SenderId  int64       `json:"sender_id"`
+			}{
+				ice.Candidate,
+				message.TargetUserId,
+			}
 
 		}
 		r.WebSocket.broadcast <- Response{
-			User_id:      r.clients[c].ParticipantID,
-			Confrence_id: r.clients[c].ConferenceID,
-			Response:     *response,
+			User_id:       r.clients[c].ParticipantID,
+			Conference_id: r.clients[c].ConferenceID,
+			Response:      *response,
 		}
 
 	}
@@ -137,13 +150,24 @@ func (r *Router) HandleWebSocketMessage() {
 		msg := <-r.WebSocket.broadcast
 		r.WebSocket.mu.Lock()
 		for client := range r.WebSocket.clients {
-			if r.WebSocket.clients[client].ParticipantID != msg.User_id && r.WebSocket.clients[client].ConferenceID == msg.Confrence_id {
+			if r.WebSocket.clients[client].ParticipantID == msg.Response.TargetUserId {
 				m, _ := json.Marshal(msg)
 				err := client.WriteMessage(websocket.TextMessage, m)
 				if err != nil {
 					slog.Error(err.Error())
 					client.Close()
 					delete(r.WebSocket.clients, client)
+				}
+				break
+			} else if msg.Response.TargetUserId == 0 {
+				if r.WebSocket.clients[client].ParticipantID != msg.User_id && r.WebSocket.clients[client].ConferenceID == msg.Conference_id {
+					m, _ := json.Marshal(msg)
+					err := client.WriteMessage(websocket.TextMessage, m)
+					if err != nil {
+						slog.Error(err.Error())
+						client.Close()
+						delete(r.WebSocket.clients, client)
+					}
 				}
 			}
 
