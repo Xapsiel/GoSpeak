@@ -50,3 +50,24 @@ func (r *ParticipantRepository) RemoveFromConference(id int64) error {
 	return err
 
 }
+func (r *ParticipantRepository) GetParticipantsByConferenceID(id string) ([]int64, error) {
+	query := `
+
+		SELECT user_id FROM participants WHERE conference_id = $1;
+	`
+	rows, err := r.db.Query(query, id)
+	if err != nil {
+		return nil, err
+	}
+	participants := make([]int64, 0)
+	for rows.Next() {
+		if rows.Err() != nil {
+			return nil, err
+		}
+		var id int64 = 0
+		rows.Scan(&id)
+		participants = append(participants, id)
+
+	}
+	return participants, nil
+}

@@ -7,9 +7,12 @@ const elements = {
 const axiosInstance = axios.create({
     baseURL: `http://${domain}`,
 });
-// Store all peer connections in a map (for mesh network)
-const peerConnections = new Map(); // Key: user_id, Value: RTCPeerConnection
-const localStreams = {}; // To store local streams for each connection
+
+// Храним все соединения (ключ: user_id, значение: RTCPeerConnection)
+const peerConnections = new Map();
+const localStreams = {}; // основной локальный поток
+const remoteStreams = {}; // удалённые потоки по user_id
+
 const auth = {
     token: window.localStorage.getItem("jwtToken"),
     user: JSON.parse(window.localStorage.getItem("user") || null),
@@ -19,10 +22,12 @@ const conference = {
     id: 0,
     creater_id: 0,
     join_url: "",
-    participants: new Map(), // Track all participants in the conference
+    participants: new Map(), // участники конференции
 };
 
 let ws = null;
+
+// Обработчики для отправки сообщений в чате
 document.getElementById("sendMessage").addEventListener("click", sendMessage);
 document.getElementById("chatInput").addEventListener("keypress", (event) => {
     if (event.key === "Enter") {
@@ -42,16 +47,19 @@ function sendMessage() {
         sent_at: new Date().toISOString(),
     };
 
+    // Локальное добавление сообщения в чат
     const chatMessages = document.getElementById("chatMessages");
     const message = document.createElement("div");
     message.classList.add("chat-message");
     message.textContent = `${auth.user.user_id}: ${input.value}`;
     chatMessages.appendChild(message);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
     ws.send(JSON.stringify(messageData));
     input.value = "";
 }
-// Modified peer connection configuration
+
+// Функция создания нового RTCPeerConnection с корректной конфигурацией
 function createPeerConnection(targetUserId) {
     const configuration = {
         iceServers: [
@@ -76,7 +84,7 @@ function createPeerConnection(targetUserId) {
     try {
         const peerConnection = new RTCPeerConnection(configuration);
 
-        // Add event handlers
+        // Обработчик изменения состояния ICE-соединения
         peerConnection.oniceconnectionstatechange = () => {
             console.log(`ICE state with ${targetUserId}:`, peerConnection.iceConnectionState);
             if (peerConnection.iceConnectionState === 'disconnected' ||
@@ -85,6 +93,7 @@ function createPeerConnection(targetUserId) {
             }
         };
 
+        // Отправка ICE кандидатов другому участнику
         peerConnection.onicecandidate = (event) => {
             if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
@@ -95,11 +104,13 @@ function createPeerConnection(targetUserId) {
             }
         };
 
+        // Обработка поступающих треков
         peerConnection.ontrack = (event) => {
-            // For mesh, we need to handle multiple remote streams
+            // Получаем контейнер для удалённых видео
             const remoteVideoContainer = document.getElementById("remoteVideos");
             let videoElement = document.getElementById(`remoteVideo-${targetUserId}`);
 
+            // Если для данного участника видео еще не создано – создаем его и удалённый медиа-поток
             if (!videoElement) {
                 videoElement = document.createElement('video');
                 videoElement.id = `remoteVideo-${targetUserId}`;
@@ -107,36 +118,38 @@ function createPeerConnection(targetUserId) {
                 videoElement.playsInline = true;
                 remoteVideoContainer.appendChild(videoElement);
             }
-
-            if (videoElement.srcObject !== event.streams[0]) {
-                videoElement.srcObject = event.streams[0];
+            if (!remoteStreams[targetUserId]) {
+                remoteStreams[targetUserId] = new MediaStream();
+                videoElement.srcObject = remoteStreams[targetUserId];
             }
+            // Добавляем поступивший трек в соответствующий поток
+            remoteStreams[targetUserId].addTrack(event.track);
         };
 
-        // Store the connection
+        // Сохраняем соединение
         peerConnections.set(targetUserId, peerConnection);
         return peerConnection;
-
     } catch (error) {
         console.error("PeerConnection creation failed:", error);
         throw error;
     }
 }
 
-// Clean up a connection when it's no longer needed
+// Очистка соединения, когда участник покидает конференцию
 function cleanupConnection(userId) {
     const pc = peerConnections.get(userId);
     if (pc) {
         pc.close();
         peerConnections.delete(userId);
-
-        // Remove the video element
-        const videoElement = document.getElementById(`remoteVideo-${userId}`);
-        if (videoElement) {
-            videoElement.parentNode.removeChild(videoElement);
-        }
     }
+    // Удаляем видео-элемент и очищаем поток
+    const videoElement = document.getElementById(`remoteVideo-${userId}`);
+    if (videoElement) {
+        videoElement.parentNode.removeChild(videoElement);
+    }
+    delete remoteStreams[userId];
 }
+
 function handleNewMessage(data) {
     const chatMessages = document.getElementById("chatMessages");
     const message = document.createElement("div");
@@ -145,36 +158,35 @@ function handleNewMessage(data) {
     chatMessages.appendChild(message);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-// Modified createOffer for mesh network
+
+// Функция создания предложения (offer) для подключения к новому участнику
 async function createOffer(targetUserId) {
     try {
-        // Get local media if we haven't already
+        // Получаем локальный медиапоток, если он ещё не установлен
         if (!localStreams.main) {
             localStreams.main = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true
             });
-
             const localVideo = document.getElementById("localVideo");
             if (localVideo) {
                 localVideo.srcObject = localStreams.main;
+                localVideo.muted = true;
             }
         }
 
-        // Create or get existing peer connection
         let peerConnection = peerConnections.get(targetUserId);
         if (!peerConnection) {
             peerConnection = createPeerConnection(targetUserId);
         }
 
-        // Add tracks if not already added
+        // Если треки еще не добавлены, добавляем их в соединение
         if (peerConnection.getSenders().length === 0) {
             localStreams.main.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStreams.main);
             });
         }
 
-        // Create and send offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
@@ -185,13 +197,12 @@ async function createOffer(targetUserId) {
                 offer: peerConnection.localDescription,
             }));
         }
-
     } catch (error) {
         console.error("Error in createOffer:", error);
     }
 }
 
-// Modified WebSocket message handler for mesh
+// Обработка сообщений WebSocket
 function handleWebSocketMessage(data) {
     if (!data.response) return;
 
@@ -224,92 +235,71 @@ function handleWebSocketMessage(data) {
     }
 }
 
-// Handle the list of participants when joining
+// Обработка списка участников при входе в конференцию
 function handleParticipantsList(participants) {
-    participants.forEach(participant => {
-        if (participant.user_id !== auth.user.user_id) {
-            conference.participants.set(participant.user_id, participant);
-            createOffer(participant.user_id); // Initiate connection to each participant
+    participants.forEach(user_id => {
+        if (user_id !== auth.user.user_id) {
+            conference.participants.set(user_id, user_id);
+            createOffer(user_id);
         }
     });
 }
-
-// Modified user joined handler
 function handleUserJoined(data) {
     const userId = data.user_id;
-    if (auth.user.user_id===userId){
-        return
-    }
-    console.log(`User ${userId} joined`);
+    if (auth.user.user_id === userId) return;
     conference.participants.set(userId, data);
     createOffer(userId);
 }
 
-// Modified user left handler
 function handleUserLeft(data) {
     const userId = data.user_id;
     console.log(`User ${userId} left`);
     conference.participants.delete(userId);
     cleanupConnection(userId);
 }
+
 async function setupLocalCamera() {
     try {
-        if (!localStreams.main) {
-            localStreams.main = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
-
-            const localVideo = document.getElementById("localVideo");
-            if (localVideo) {
-                localVideo.srcObject = localStreams.main;
-                localVideo.muted = true; // Добавляем muted для локального видео
-                console.log("Local camera stream set up successfully");
-            }
-        }
+        localStreams.main = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+        document.getElementById("localVideo").srcObject = localStreams.main;
     } catch (error) {
-        console.error("Error setting up local camera:", error);
-        // Можно добавить обработку ошибки, например, показать сообщение пользователю
-        alert("Could not access camera/microphone. Please check permissions.");
+        console.error("Camera error:", error);
     }
 }
-// Modified offer handler for mesh
+// При поступлении предложения (offer) от другого участника
 async function handleReceiveOffer(data) {
     try {
         const { sender_id, offer } = data;
 
-        // Create or get existing peer connection
         let peerConnection = peerConnections.get(sender_id);
         if (!peerConnection) {
             peerConnection = createPeerConnection(sender_id);
         }
 
-        // Set remote description
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
-        // Get local media if we haven't already
         if (!localStreams.main) {
             localStreams.main = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true
             });
-
             const localVideo = document.getElementById("localVideo");
             if (localVideo) {
                 localVideo.srcObject = localStreams.main;
+                localVideo.muted = true;
             }
         }
-
-        // Add tracks if not already added
         if (peerConnection.getSenders().length === 0) {
             localStreams.main.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStreams.main);
             });
         }
 
-        // Create and send answer
         const answer = await peerConnection.createAnswer();
-        peerConnection.setLocalDescription(answer);
+        await peerConnection.setLocalDescription(answer);  // ждём установку локального описания
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
@@ -318,32 +308,29 @@ async function handleReceiveOffer(data) {
                 answer: peerConnection.localDescription,
             }));
         }
-
     } catch (error) {
         console.error("Error in handleReceiveOffer:", error);
     }
 }
 
-// Modified answer handler for mesh
+// При поступлении ответа (answer) на наше предложение
 async function handleReceiveAnswer(data) {
     try {
         const { sender_id, answer } = data;
         const peerConnection = peerConnections.get(sender_id);
-
         if (peerConnection) {
-             peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
         }
     } catch (error) {
         console.error("Error in handleReceiveAnswer:", error);
     }
 }
 
-// Modified ICE candidate handler for mesh
+// Обработка ICE кандидатов
 async function handleReceiveIceCandidate(data) {
     try {
         const { sender_id, candidate } = data;
         const peerConnection = peerConnections.get(sender_id);
-
         if (peerConnection) {
             await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
         }
@@ -352,7 +339,7 @@ async function handleReceiveIceCandidate(data) {
     }
 }
 
-// Modified WebSocket setup to request participants list
+// Настройка WebSocket соединения. При подключении отправляем сообщения для входа и запроса списка участников
 function setupWebSocket() {
     if (!conference.id) {
         console.error("Error: conference_id not set.");
@@ -369,8 +356,6 @@ function setupWebSocket() {
             creater_id: conference.creater_id,
             conference_id: conference.id,
         }));
-
-        // Request list of current participants
         ws.send(JSON.stringify({
             type: "request_participants",
             conference_id: conference.id,
@@ -386,14 +371,14 @@ function setupWebSocket() {
     ws.onerror = (error) => console.error("WebSocket error:", error);
     ws.onclose = () => {
         console.log("WebSocket connection closed.");
-        // Clean up all connections when WS closes
+        // Очищаем все соединения при закрытии WS
         peerConnections.forEach((pc, userId) => {
             cleanupConnection(userId);
         });
     };
 }
 
-// Modified initialization
+// Инициализация: раздел создания конференции или вход в конференцию
 document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
@@ -404,6 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initializeUser().then(() => {
         if (joinUrl) {
+            // Запрос на вход в конференцию
             axiosInstance.get(`/conference/join?join_url=${joinUrl}`, {
                 headers: { Authorization: `Bearer ${auth.token}` }
             }).then(response => {
@@ -413,7 +399,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     conference.creater_id = response.data.creater_id;
                     conference.join_url = response.data.join_url;
                     setupWebSocket();
-                    createPeerConnection(auth.user.user_id)
+                    // НЕ создаем лишнее соединение для себя
+                    // createPeerConnection(auth.user.user_id);
                 }
             }).catch(error => {
                 console.error("Join error:", error);
@@ -447,6 +434,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
 function getUser() {
     return axiosInstance.get("/user/", {
         headers: { "Authorization": `Bearer ${auth.token}` },
@@ -465,10 +453,11 @@ function initializeUser() {
     }
     return Promise.resolve();
 }
+
+// Закрытие соединений при уходе со страницы
 window.addEventListener('beforeunload', () => {
     if (ws) ws.close();
     peerConnections.forEach((pc, userId) => {
         cleanupConnection(userId);
     });
 });
-
