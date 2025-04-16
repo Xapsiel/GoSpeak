@@ -179,7 +179,10 @@ async function createOffer(targetUserId) {
         if (!peerConnection) {
             peerConnection = createPeerConnection(targetUserId);
         }
-
+        if (peerConnection.signalingState !== "stable") {
+            peerConnection = createPeerConnection(targetUserId);
+            return;
+        }
         // Если треки еще не добавлены, добавляем их в соединение
         if (peerConnection.getSenders().length === 0) {
             localStreams.main.getTracks().forEach(track => {
@@ -227,23 +230,23 @@ function handleWebSocketMessage(data) {
         case "receive_ice_candidate":
             handleReceiveIceCandidate(messageData);
             break;
-        case "participants_list":
-            handleParticipantsList(messageData);
-            break;
+        // case "participants_list":
+        //     handleParticipantsList(messageData);
+        //     break;
         default:
             console.warn("Unknown message type:", data);
     }
 }
 
 // Обработка списка участников при входе в конференцию
-function handleParticipantsList(participants) {
-    participants.forEach(user_id => {
-        if (user_id !== auth.user.user_id) {
-            conference.participants.set(user_id, user_id);
-            createOffer(user_id);
-        }
-    });
-}
+// function handleParticipantsList(participants) {
+//     participants.forEach(user_id => {
+//         if (user_id !== auth.user.user_id) {
+//             conference.participants.set(user_id, user_id);
+//             createOffer(user_id);
+//         }
+//     });
+// }
 function handleUserJoined(data) {
     const userId = data.user_id;
     if (auth.user.user_id === userId) return;
