@@ -21,18 +21,21 @@ type Router struct {
 	service service.Service
 	cfg     config.HostConfig
 	*WebSocket
+	Conference map[string]*model.Conference
 }
 type WebSocket struct {
 	mu        *sync.Mutex
-	clients   map[*websocket.Conn]model.Participant
+	clients   map[*websocket.Conn]*model.Participant
+	peers     map[*websocket.Conn]*model.Peer
+	rooms     map[string]*model.Room
 	broadcast chan Response
 }
 type Response struct {
-	User_id       int64                   `json:"user_id"`
-	Conference_id string                  `json:"confrence_id"`
-	Response      model.WebSocketResponse `json:"response"`
-	Target        int64                   `json:"target,omitempty"`
-	Sender        int64                   `json:"sender,omitempty"`
+	UserId       int64                   `json:"user_id"`
+	ConferenceId string                  `json:"confrence_id"`
+	Response     model.WebSocketResponse `json:"response"`
+	Target       int64                   `json:"target,omitempty"`
+	Sender       int64                   `json:"sender,omitempty"`
 }
 
 func NewRouter(service service.Service, cfg config.HostConfig) *Router {
@@ -40,8 +43,10 @@ func NewRouter(service service.Service, cfg config.HostConfig) *Router {
 		cfg: cfg,
 		WebSocket: &WebSocket{
 			mu:        &sync.Mutex{},
-			clients:   make(map[*websocket.Conn]model.Participant),
+			clients:   make(map[*websocket.Conn]*model.Participant),
 			broadcast: make(chan Response),
+			peers:     make(map[*websocket.Conn]*model.Peer),
+			rooms:     make(map[string]*model.Room),
 		},
 	}
 }
