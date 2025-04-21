@@ -19,8 +19,9 @@ const (
 )
 
 type Router struct {
-	service service.Service
-	cfg     config.HostConfig
+	service   service.Service
+	cfg       config.HostConfig
+	roomslock sync.Mutex
 	*WebSocket
 	Conference map[string]*model.Conference
 }
@@ -91,7 +92,7 @@ func (r *Router) Routes(app fiber.Router) {
 	conference.Get("/join", r.JoinConferenceHandler)
 
 	app.Get("/ws", websocket.New(r.WebSocketHandler))
-
+	go r.cleanupRooms()
 }
 
 func (r *Router) NewPage() *Page {

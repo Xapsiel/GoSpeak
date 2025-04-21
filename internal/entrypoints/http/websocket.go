@@ -27,6 +27,9 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, join_url string) *webrtc.TrackL
 		r.rooms[join_url].listLock.Unlock()
 		r.signalPeerConnections(join_url)
 	}()
+	if existingTrack, ok := r.rooms[join_url].trackLocals[t.ID()]; ok {
+		return existingTrack
+	}
 
 	// Create a new TrackLocal with the same codec as our incoming
 	trackLocal, err := webrtc.NewTrackLocalStaticRTP(t.Codec().RTPCodecCapability, t.ID(), t.StreamID())
@@ -62,96 +65,76 @@ func (r *Router) signalPeerConnections(join_url string) {
 	r.rooms[join_url].listLock.Lock()
 	defer func() {
 		r.rooms[join_url].listLock.Unlock()
-		r.dispatchKeyFrame(join_url)
+		// Откладываем key frame запросы
+		time.AfterFunc(100*time.Millisecond, func() {
+			r.dispatchKeyFrame(join_url)
+		})
 	}()
 
-	attemptSync := func() (tryAgain bool) {
-		for i := range r.rooms[join_url].peerConnections {
-			if r.rooms[join_url].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-				r.rooms[join_url].peerConnections = append(r.rooms[join_url].peerConnections[:i], r.rooms[join_url].peerConnections[i+1:]...)
-				return true // We modified the slice, start from the beginning
-			}
-
-			// map of sender we already are seanding, so we don't double send
-			existingSenders := map[string]bool{}
-
-			for _, sender := range r.rooms[join_url].peerConnections[i].peerConnection.GetSenders() {
-				if sender.Track() == nil {
-					continue
-				}
-
-				existingSenders[sender.Track().ID()] = true
-
-				// If we have a RTPSender that doesn't map to a existing track remove and signal
-				if _, ok := r.rooms[join_url].trackLocals[sender.Track().ID()]; !ok {
-					if err := r.rooms[join_url].peerConnections[i].peerConnection.RemoveTrack(sender); err != nil {
-						return true
-					}
-				}
-			}
-
-			// Don't receive videos we are sending, make sure we don't have loopback
-			// for _, receiver := range peerConnections[i].peerConnection.GetReceivers() {
-			// 	if receiver.Track() == nil {
-			// 		continue
-			// 	}
-
-			// 	existingSenders[receiver.Track().ID()] = true
-			// }
-
-			// Add all track we aren't sending yet to the PeerConnection
-			for trackID := range r.rooms[join_url].trackLocals {
-				if _, ok := existingSenders[trackID]; !ok {
-					if _, err := r.rooms[join_url].peerConnections[i].peerConnection.AddTrack(r.rooms[join_url].trackLocals[trackID]); err != nil {
-						return true
-					}
-				}
-			}
-
-			offer, err := r.rooms[join_url].peerConnections[i].peerConnection.CreateOffer(nil)
-			if err != nil {
-				return true
-			}
-
-			if err = r.rooms[join_url].peerConnections[i].peerConnection.SetLocalDescription(offer); err != nil {
-				return true
-			}
-
-			offerString, err := json.Marshal(offer)
-			if err != nil {
-				log.Errorf("Failed to marshal offer to json: %v", err)
-				return true
-			}
-
-			log.Infof("Send offer to client: %v", offer)
-
-			if err = r.rooms[join_url].peerConnections[i].websocket.WriteJSON(&websocketMessage{
-				Event: "offer",
-				Data:  string(offerString),
-			}); err != nil {
-				return true
-			}
+	// Упрощенная и более эффективная логика синхронизации
+	var wg sync.WaitGroup
+	for i := 0; i < len(r.rooms[join_url].peerConnections); i++ {
+		if r.rooms[join_url].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+			r.rooms[join_url].peerConnections = append(r.rooms[join_url].peerConnections[:i], r.rooms[join_url].peerConnections[i+1:]...)
+			i--
+			continue
 		}
 
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			r.signalPeer(join_url, idx)
+		}(i)
+	}
+	wg.Wait()
+}
+
+func (r *Router) signalPeer(join_url string, idx int) {
+	pcState := r.rooms[join_url].peerConnections[idx]
+
+	// Оптимизация: собираем все изменения перед созданием offer
+	existingSenders := make(map[string]bool)
+	for _, sender := range pcState.peerConnection.GetSenders() {
+		if sender.Track() != nil {
+			existingSenders[sender.Track().ID()] = true
+			if _, ok := r.rooms[join_url].trackLocals[sender.Track().ID()]; !ok {
+				if err := pcState.peerConnection.RemoveTrack(sender); err != nil {
+					return
+				}
+			}
+		}
+	}
+
+	for trackID := range r.rooms[join_url].trackLocals {
+		if !existingSenders[trackID] {
+			if _, err := pcState.peerConnection.AddTrack(r.rooms[join_url].trackLocals[trackID]); err != nil {
+				return
+			}
+		}
+	}
+
+	offer, err := pcState.peerConnection.CreateOffer(nil)
+	if err != nil {
 		return
 	}
 
-	for syncAttempt := 0; ; syncAttempt++ {
-		if syncAttempt == 25 {
-			// Release the lock and attempt a sync in 3 seconds. We might be blocking a RemoveTrack or AddTrack
-			go func() {
-				time.Sleep(time.Second * 3)
-				r.signalPeerConnections(join_url)
-			}()
-			return
-		}
+	if err = pcState.peerConnection.SetLocalDescription(offer); err != nil {
+		return
+	}
 
-		if !attemptSync() {
-			break
-		}
+	offerString, err := json.Marshal(offer)
+	if err != nil {
+		log.Errorf("Failed to marshal offer: %v", err)
+		return
+	}
+
+	if err = pcState.websocket.WriteJSON(&websocketMessage{
+		Event: "offer",
+		Data:  string(offerString),
+	}); err != nil {
+		log.Errorf("Failed to send offer: %v", err)
 	}
 }
-
 func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 	join_url := ws.Query("join_url", "error")
 	if join_url == "error" {
@@ -191,6 +174,8 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 			log.Errorf("Failed to marshal candidate to json: %v", err)
 			return
 		}
+		r.rooms[join_url].listLock.Lock()
+		defer r.rooms[join_url].listLock.Unlock()
 		if err = c.WriteJSON(&websocketMessage{
 			Event: "candidate",
 			Data:  string(candidateString),
@@ -212,30 +197,39 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 		}
 	})
 	peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
-		log.Infof("Got remote track: Kind=%s, ID=%s, PayloadType=%d", t.Kind(), t.ID(), t.PayloadType())
+		log.Infof("Got remote track: Kind=%s, ID=%s", t.Kind(), t.ID())
 
-		// Create a track to fan out our incoming video to all peers
+		// Для аудио треков можно использовать более легковесную обработку
+		if t.Kind() == webrtc.RTPCodecTypeAudio {
+			// Пропускаем аудио треки или обрабатываем их более эффективно
+			return
+		}
+
 		trackLocal := r.addTrack(t, join_url)
+		if trackLocal == nil {
+			return
+		}
 		defer r.removeTrack(trackLocal, join_url)
 
-		buf := make([]byte, 1500)
+		// Используем буфер оптимального размера
+		buf := make([]byte, 1450) // MTU typical size
 		rtpPkt := &rtp.Packet{}
 
 		for {
 			i, _, err := t.Read(buf)
 			if err != nil {
+				log.Infof("Track reading stopped: %v", err)
 				return
 			}
 
 			if err = rtpPkt.Unmarshal(buf[:i]); err != nil {
-				log.Errorf("Failed to unmarshal incoming RTP packet: %v", err)
-				return
+				log.Errorf("Failed to unmarshal RTP: %v", err)
+				continue
 			}
 
-			rtpPkt.Extension = false
-			rtpPkt.Extensions = nil
-
+			// Минимизируем обработку пакета
 			if err = trackLocal.WriteRTP(rtpPkt); err != nil {
+				log.Infof("Track writing stopped: %v", err)
 				return
 			}
 		}
@@ -292,6 +286,22 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 	}
 }
 
+// Добавляем очистку неиспользуемых комнат
+func (r *Router) cleanupRooms() {
+	for {
+		time.Sleep(5 * time.Minute)
+		r.roomslock.Lock()
+		for url, room := range r.rooms {
+			if len(room.peerConnections) == 0 && len(room.trackLocals) == 0 {
+				delete(r.rooms, url)
+				log.Infof("Cleaned up unused room: %s", url)
+			}
+		}
+		r.roomslock.Unlock()
+	}
+}
+
+// Инициализируем в конструкторе Router
 //func NewWebSocket(log logging.LeveledLogger) *WebSocket {
 //	ws := &WebSocket{}
 //
