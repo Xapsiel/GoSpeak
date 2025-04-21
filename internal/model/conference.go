@@ -8,7 +8,7 @@ type Conference struct {
 	ConferenceID    string    `json:"conference_id"`
 	Title           string    `json:"title"`
 	Description     string    `json:"description"`
-	CreaterID       int64     `json:"creator_id"`
+	CreatorID       int64     `json:"creator_id"`
 	StartTime       time.Time `json:"start_time"`
 	EndTime         time.Time `json:"end_time"`
 	Status          string    `json:"status"`

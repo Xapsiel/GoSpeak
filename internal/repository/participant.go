@@ -33,7 +33,7 @@ func (r *ParticipantRepository) AddToConference(u int64, conf *model.Conference)
 	
 			`
 	role := "participant"
-	if (u) == conf.CreaterID {
+	if (u) == conf.CreatorID {
 		role = "host"
 	}
 	_, err := r.db.Exec(query, conf.ConferenceID, u, role, time.Now())

@@ -1,29 +1,29 @@
 package model
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/gofiber/websocket/v2"
+	"github.com/pion/webrtc/v3"
 )
 
-type WebSocketMessage struct {
-	Type         string          `json:"type"`
-	ConferenceId string          `json:"conference_id"`
-	SenderId     int64           `json:"sender_id"`
-	TargetUserId int64           `json:"target_user_id"`
-	Payload      json.RawMessage `json:"payload"`
+type WebsocketMessage struct {
+	Event string `json:"event"`
+	Data  string `json:"data"`
 }
 
-type WebSocketResponse struct {
-	Type         string          `json:"type"`
-	Data         interface{}     `json:"data"`
-	TargetUserId int64           `json:"target_user_id"`
-	Payload      json.RawMessage `json:"payload"`
+type PeerConnectionState struct {
+	peerConnection *webrtc.PeerConnection
+	websocket      *ThreadSafeWriter
+}
+type ThreadSafeWriter struct {
+	*websocket.Conn
+	sync.Mutex
 }
 
-type Room struct {
-	ID          string
-	Participant map[*websocket.Conn]*Peer
-	Mu          sync.RWMutex
+func (t *ThreadSafeWriter) WriteJSON(v interface{}) error {
+	t.Lock()
+	defer t.Unlock()
+
+	return t.Conn.WriteJSON(v)
 }

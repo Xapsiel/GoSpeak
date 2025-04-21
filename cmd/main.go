@@ -40,7 +40,6 @@ func main() {
 	})
 
 	router.Routes(app)
-	go router.HandleWebSocketMessage()
 
 	slog.Error(app.Listen(":" + config.HostConfig.Port).Error())
 

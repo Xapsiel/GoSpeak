@@ -2,7 +2,7 @@
 db:
   host: localhost
   user: postgres
-  port: 5432
+  port: 5433
   password: postgres
   name: gospeak
   ssl_mode: disable

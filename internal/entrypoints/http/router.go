@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/websocket/v2"
+	"github.com/pion/webrtc/v3"
 )
 
 const (
@@ -24,29 +25,39 @@ type Router struct {
 	Conference map[string]*model.Conference
 }
 type WebSocket struct {
-	mu        *sync.Mutex
-	clients   map[*websocket.Conn]*model.Participant
-	peers     map[*websocket.Conn]*model.Peer
-	rooms     map[string]*model.Room
-	broadcast chan Response
+	rooms map[string]*Room
 }
-type Response struct {
-	UserId       int64                   `json:"user_id"`
-	ConferenceId string                  `json:"confrence_id"`
-	Response     model.WebSocketResponse `json:"response"`
-	Target       int64                   `json:"target,omitempty"`
-	Sender       int64                   `json:"sender,omitempty"`
+type websocketMessage struct {
+	Event string `json:"event"`
+	Data  string `json:"data"`
+}
+
+type peerConnectionState struct {
+	peerConnection *webrtc.PeerConnection
+	websocket      *threadSafeWriter
+}
+type Room struct {
+	listLock        sync.RWMutex
+	peerConnections []peerConnectionState
+	trackLocals     map[string]*webrtc.TrackLocalStaticRTP
+}
+type threadSafeWriter struct {
+	*websocket.Conn
+	sync.Mutex
+}
+
+func (t *threadSafeWriter) WriteJSON(v interface{}) error {
+	t.Lock()
+	defer t.Unlock()
+
+	return t.Conn.WriteJSON(v)
 }
 
 func NewRouter(service service.Service, cfg config.HostConfig) *Router {
 	return &Router{service: service,
 		cfg: cfg,
 		WebSocket: &WebSocket{
-			mu:        &sync.Mutex{},
-			clients:   make(map[*websocket.Conn]*model.Participant),
-			broadcast: make(chan Response),
-			peers:     make(map[*websocket.Conn]*model.Peer),
-			rooms:     make(map[string]*model.Room),
+			rooms: make(map[string]*Room),
 		},
 	}
 }
@@ -79,11 +90,14 @@ func (r *Router) Routes(app fiber.Router) {
 	conference.Post("/create", r.CreateConferenceHandler)
 	conference.Get("/join", r.JoinConferenceHandler)
 
-	app.Use("/ws", r.WebsocketMiddleware)
-	app.Get("/ws", websocket.New(r.HandleWebSocketConnection))
+	app.Get("/ws", websocket.New(r.WebSocketHandler))
 
 }
 
 func (r *Router) NewPage() *Page {
 	return &Page{Domain: r.cfg.Domain, Name: r.cfg.Name}
+}
+
+func (r *Router) HandleWebSocketConnection(conn *websocket.Conn) {
+
 }

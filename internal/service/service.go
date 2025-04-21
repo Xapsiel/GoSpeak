@@ -3,9 +3,6 @@ package service
 import (
 	"GoSpeak/internal/model"
 	"GoSpeak/internal/repository"
-
-	"github.com/gofiber/websocket/v2"
-	"github.com/pion/webrtc/v3"
 )
 
 const (
@@ -17,7 +14,6 @@ type Service struct {
 	Conference
 	Participant
 	Message
-	WebRTC
 }
 
 func NewService(repo repository.Repository) *Service {
@@ -26,7 +22,6 @@ func NewService(repo repository.Repository) *Service {
 		Conference:  NewConferenceService(repo),
 		Participant: NewParticipantService(repo),
 		Message:     NewMessageService(repo),
-		WebRTC:      NewWebRTCService(repo),
 	}
 }
 
@@ -50,11 +45,4 @@ type Participant interface {
 
 type Message interface {
 	Send(m *model.Message) error
-}
-
-type WebRTC interface {
-	CreatePeerConnection(room *model.Room, conn *websocket.Conn) *webrtc.PeerConnection
-	RelayTrack(remote *webrtc.TrackRemote, local *webrtc.TrackLocalStaticRTP)
-	ReceiveOffer(peer *model.Peer, offer webrtc.SessionDescription) error
-	ReceiveICECandidate(peer *model.Peer, candidate webrtc.ICECandidateInit) error
 }

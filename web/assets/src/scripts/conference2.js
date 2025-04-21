@@ -14,14 +14,14 @@ const configuration = {
         {
             urls: [
                 "stun:stun.l.google.com:19302",
-                // "stun:global.stun.twilio.com:3478"
+                "stun:global.stun.twilio.com:3478"
             ]
         },
         {
             urls: [
-                // "turn:relay1.expressturn.com:3478?transport=udp",
+                "turn:relay1.expressturn.com:3478?transport=udp",
                 "turn:relay1.expressturn.com:3478?transport=tcp",
-                // "turns:relay1.expressturn.com:5349?transport=tcp"
+                "turns:relay1.expressturn.com:5349?transport=tcp"
             ],
             username: "ef47B9MOBBMFPVPIJO",
             credential: "9BZOLQ3r6Lxa9qTL"
@@ -35,98 +35,66 @@ async function initLocalStream(){
             video:true,
             audio:true
         });
+        document.getElementById("localVideo").srcObject = state.localStream;
     }catch (error){
         console.error("Error accessing media devices:", error);
     }
 }
 
 function createPeerConnection(){
-    state.peerConnection = new RTCPeerConnection(configuration);
-
-    state.peerConnection.ontrack = function (event){
-        if (event.track.kind==='audio'){
-            return
+    const pc = new RTCPeerConnection(configuration);
+    pc.onicecandidate= ({candidate})=>{
+        if (candidate){
+            sendWSMessage({type: "ice", candidate});
         }
-        let el = document.createElement(event.track.kind);
-        el.srcObject = event.streams[0];
-        el.autoplay =true;
-        el.controls=false;
-        document.getElementById("remoteVideos").appendChild(el);
-        event.track.onmute = function (event){}
-        event.track.onunmute = function (event){
-            el.play();
-        }
-        event.streams[0].onremovetrack = ({track})=>{
-            if (el.parentNode){
-                el.parentNode.removeChild(el);
-            }
-        }
-    }
-    // document.getElementById('localVideo').srcObject = state.localStream;
-    state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track,state.localStream))
-    state.peerConnection.onicecandidate = e =>{
-        if (!e.candidate){
-            return;
-        }
-        state.ws.send(JSON.stringify({event: 'candidate', data: JSON.stringify(e.candidate)}));
-    }
-}
-
-function  setupWebSocket(){
-    const params = new URLSearchParams(window.location.search);
-    const joinUrl = params.get('join_url');
-    console.log(joinUrl)
-    state.ws = new WebSocket(`ws://${domain}/ws?join_url=${joinUrl}`);
-    state.ws.onopen = async () => {
-        sendWSMessage({event: 'join', conference_id: conference.id, user_id: auth.user.user_id});
     };
-    state.ws.onclose  = function(event){
-        window.alert("websocket has closed");
-    }
-    state.ws.onerror=function (event){
-        console.log("ERROR: "+event.data)
-    }
-    state.ws.onmessage = function (event){
-        let msg = JSON.parse(event.data);
-        if (!msg){
-            return console.log("failed to parse msg")
+    pc.ontrack = ({streams,track})=>{
+        const stream = streams[0];
+        const userId = stream.id;
+        if (!state.remoteStreams.has(userId)){
+            const video =document.createElement("video");
+            video.id = `remote-${userId}`;
+            video.autoplay=true;
+            video.playsInline=true;
+            document.getElementById("remoteVideos").appendChild(video);
+            state.remoteStreams.set(userId, stream);
         }
-        switch (msg.event){
-            case "answer":
-                let answer = JSON.parse(msg.data);
-                if (!answer){
-                    return console.log("failed to parse answer");
-                }
-                state.peerConnection.setRemoteDescription(answer)
-                return
+        document.getElementById(`remote-${userId}`).srcObject=stream;
+
+    }
+    state.localStream.getTracks().forEach(track=>{
+        pc.addTrack(track, state.localStream);
+    })
+    return pc;
+}
+function  setupWebSocket(){
+    state.ws = new WebSocket(`ws://${domain}/ws`);
+    state.ws.onopen = ()=>{
+        sendWSMessage({type: 'join', conference_id: state.conferenceId, user_id: auth.user.userId});
+    };
+    state.ws.onmessage = async ({data}) =>{
+        const msg = JSON.parse(data);
+        switch (msg.type){
             case "offer":
-                let offer =JSON.parse(msg.data);
-                if (!offer){
-                    return console.log("failed to parse offer");
-                }
-                state.peerConnection.setRemoteDescription(offer);
-                state.peerConnection.createAnswer().then(answer=>{
-                    state.peerConnection.setLocalDescription(answer);
-                    state.ws.send(JSON.stringify({event: "answer", data: JSON.stringify(answer)}))
-                })
-                return
-            case "candidate":
-                let candidate = JSON.parse(msg.data);
-                if (!candidate){
-                    return console.log("failed to parse candidate");
-                }
-                state.peerConnection.addIceCandidate(candidate);
+                await handleOffer(msg.offer);
+                break;
+            case "ice":
+                await state.peerConnection.addIceCandidate(msg.candidate);
+                break;
+            case "newParticipant":
+                handleNewParticipant(msg.user_id);
+                break;
+            case "leftParticipant":
+                handleLeftParticipant(msg.user_id);
+                break;
         }
     }
 }
-
 async function handleOffer(offer){
     await state.peerConnection.setRemoteDescription(offer);
-    state.peerConnection.createAnswer().then(answer=>{
-        state.peerConnection.setLocalDescription(answer)
-        sendWSMessage({type: 'payload', answer});
-    }
-    );
+    const answer = await state.peerConnection.createAnswer();
+    await state.peerConnection.setLocalDescription(answer);
+    sendWSMessage({type: 'answer', answer});
 }
 function sendWSMessage(message){
     if (state.ws.readyState===WebSocket.OPEN){
@@ -247,10 +215,8 @@ function initializeUser() {
 }
 async function initConference() {
     await initLocalStream();
-    await createPeerConnection();
-
+    state.peerConnection = createPeerConnection();
     setupWebSocket();
-
 }
 
 function cleanup() {

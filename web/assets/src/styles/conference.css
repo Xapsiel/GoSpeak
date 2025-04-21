@@ -1,3 +1,26 @@
+/* Основные стили */
+:root {
+    --primary-color: #4A90E2;
+    --secondary-color: #2C3E50;
+    --accent-color: #E74C3C;
+    --background-color: #F5F7FA;
+    --text-color: #2C3E50;
+    --border-radius: 10px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
 /* Основной контейнер конференции */
 .conference {
     background: #ffffff;
@@ -55,4 +78,113 @@ video {
 
 #sendMessage {
     margin-top: 10px;
+}
+
+/* Стили для создания конференции */
+.conference-create .card {
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    max-width: 600px;
+    width: 100%;
+    margin: 50px auto;
+    border: 3px solid #007bff;
+}
+
+.conference-create h2 {
+    color: #007bff;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+/* Поля формы */
+.conference-create .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.conference-create label {
+    font-weight: bold;
+    color: #555;
+}
+
+.conference-create input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+
+/* Кнопки */
+#createConferenceButton {
+    background: #007bff;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#createConferenceButton:hover {
+    background: #0069d9;
+}
+
+#endCallButton {
+    background: #dc3545;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    width: 100%;
+    margin-top: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#endCallButton:hover {
+    background: #c82333;
+}
+
+/* Скрытие элементов */
+.d-none {
+    display: none !important;
+}
+
+/* Адаптивный дизайн */
+@media (max-width: 992px) {
+    .d-flex {
+        flex-direction: column;
+    }
+    
+    .video-section {
+        margin-right: 0;
+        margin-bottom: 2rem;
+    }
+    
+    .chat-section {
+        width: 100%;
+    }
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.conference-create,
+.conference {
+    animation: fadeIn 0.3s ease-out;
 }

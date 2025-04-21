@@ -2,43 +2,494 @@
 
 <script type="module" src="/assets/src/scripts/conference.js"></script>
 
-<main class="container mt-5">
+<main class="conference-container">
     <section id="createConference" class="conference-create d-none">
-        <div class="card">
-            <div class="card-body text-center">
+        <div class="conference-card">
+            <div class="conference-header">
+                <div class="logo-container">
+                    <svg class="logo" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                </div>
                 <h2>Создать новую конференцию</h2>
-
-                <form id="createConferenceForm">
-                    <div class="form-group">
-                        <label for="title">Название конференции:</label>
-                        <input type="text" class="form-control" id="title" name="title" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="description">Описание конференции:</label>
-                        <input type="text" class="form-control" id="description" name="description" >
-                    </div>
-                    <button type="submit" id="createConferenceButton" >Создать конференцию</button>
-                </form>
-
+                <p class="conference-subtitle">Начните встречу с вашими коллегами</p>
             </div>
+
+            <form id="createConferenceForm" class="conference-form">
+                <div class="form-group">
+                    <label for="title">Название конференции</label>
+                    <div class="input-group">
+                        <span class="input-icon">📝</span>
+                        <input type="text" id="title" name="title" required placeholder="Введите название конференции">
+                        <div class="input-focus-border"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Описание конференции</label>
+                    <div class="input-group">
+                        <span class="input-icon">📋</span>
+                        <input type="text" id="description" name="description" placeholder="Добавьте описание конференции">
+                        <div class="input-focus-border"></div>
+                    </div>
+                </div>
+                
+                <button type="submit" id="createConferenceButton" class="conference-button">
+                    <span>Создать конференцию</span>
+                    <svg class="button-icon" viewBox="0 0 24 24">
+                        <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/>
+                    </svg>
+                </button>
+            </form>
         </div>
     </section>
+
     <section id="conferenceSection" class="conference d-none">
-        <h2>Видеоконференция</h2>
-        <div class="d-flex">
-            <div class="video-section">
-                <video id="localVideo" class="w-100" autoplay muted></video>
-                <video id="remoteVideo" class="w-100" autoplay></video>
-                <div id="remoteVideos"></div>
-                <button id="endCallButton" class="btn btn-danger btn-block mt-3">Завершить звонок</button>
+        <div class="conference-room">
+            <div class="conference-header">
+                <h2>Видеоконференция</h2>
+                <div class="conference-controls">
+                    <button class="control-button" id="toggleVideo" title="Включить/выключить видео">
+                        <svg class="control-icon" viewBox="0 0 24 24">
+                            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                        </svg>
+                    </button>
+                    <button class="control-button" id="toggleAudio" title="Включить/выключить микрофон">
+                        <svg class="control-icon" viewBox="0 0 24 24">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                    </button>
+                    <button class="control-button danger" id="endCallButton" title="Завершить звонок">
+                        <svg class="control-icon" viewBox="0 0 24 24">
+                            <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <div class="chat-section ml-4">
-                <h3>Чат</h3>
-                <div id="chatMessages" class="chat-messages mb-3" style="height: 300px; overflow-y: auto;"></div>
-                <input type="text" id="chatInput" class="form-control" placeholder="Введите сообщение">
-                <button id="sendMessage" class="btn btn-primary btn-block mt-2">Отправить</button>
+
+            <div class="conference-content">
+                <div class="video-section">
+                    <div id="remoteVideos" class="video-grid"></div>
+                </div>
+                
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h3>Чат</h3>
+                        <button class="chat-toggle" title="Свернуть/развернуть чат">
+                            <svg class="chat-icon" viewBox="0 0 24 24">
+                                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="chat-container">
+                        <div id="chatMessages" class="chat-messages"></div>
+                        
+                        <div class="chat-input-container">
+                            <div class="input-group">
+                                <input type="text" id="chatInput" class="chat-input" placeholder="Введите сообщение...">
+                                <button id="sendMessage" class="send-button">
+                                    <svg class="send-icon" viewBox="0 0 24 24">
+                                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 </main>
+
+<style>
+.conference-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.conference-container::before {
+    content: '';
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.conference-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 1.5rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 2.5rem;
+    position: relative;
+    z-index: 1;
+    transform: translateY(0);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.conference-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.conference-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.logo-container {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.logo {
+    width: 48px;
+    height: 48px;
+    fill: #667eea;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.conference-header h2 {
+    color: #2d3748;
+    font-size: 2.25rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.conference-subtitle {
+    color: #718096;
+    font-size: 1.1rem;
+}
+
+.conference-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    color: #4a5568;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 1rem;
+    color: #667eea;
+    font-size: 1.2rem;
+    transition: color 0.3s ease;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 0.875rem 1rem 0.875rem 2.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.input-group input:focus + .input-icon {
+    color: #764ba2;
+}
+
+.input-focus-border {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+}
+
+.input-group input:focus ~ .input-focus-border {
+    width: 100%;
+}
+
+.conference-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.conference-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: 0.5s;
+}
+
+.conference-button:hover::before {
+    left: 100%;
+}
+
+.conference-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.button-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    transition: transform 0.3s ease;
+}
+
+.conference-button:hover .button-icon {
+    transform: translateX(3px);
+}
+
+/* Стили для страницы конференции */
+.conference-room {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 1.5rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+.conference-controls {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.control-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #f7fafc;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.control-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.control-button.danger {
+    background: #fc8181;
+    color: white;
+}
+
+.control-button.danger:hover {
+    background: #f56565;
+}
+
+.control-icon {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.conference-content {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.video-section {
+    flex: 1;
+    min-height: 500px;
+    background: #2d3748;
+    border-radius: 1rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    padding: 1rem;
+    height: 100%;
+}
+
+.chat-section {
+    width: 300px;
+    background: #f7fafc;
+    border-radius: 1rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #edf2f7;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.chat-header h3 {
+    margin: 0;
+    color: #2d3748;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.chat-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #718096;
+    transition: color 0.3s ease;
+}
+
+.chat-toggle:hover {
+    color: #4a5568;
+}
+
+.chat-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px);
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.chat-input-container {
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.chat-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.send-button {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #667eea;
+    transition: color 0.3s ease;
+}
+
+.send-button:hover {
+    color: #764ba2;
+}
+
+.send-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+@media (max-width: 768px) {
+    .conference-content {
+        flex-direction: column;
+    }
+    
+    .chat-section {
+        width: 100%;
+        height: 300px;
+    }
+    
+    .video-section {
+        min-height: 300px;
+    }
+    
+    .conference-controls {
+        justify-content: center;
+    }
+}
+</style>
