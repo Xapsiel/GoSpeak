@@ -200,10 +200,10 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 		log.Infof("Got remote track: Kind=%s, ID=%s", t.Kind(), t.ID())
 
 		// Для аудио треков можно использовать более легковесную обработку
-		if t.Kind() == webrtc.RTPCodecTypeAudio {
-			// Пропускаем аудио треки или обрабатываем их более эффективно
-			return
-		}
+		//if t.Kind() == webrtc.RTPCodecTypeAudio {
+		//	// Пропускаем аудио треки или обрабатываем их более эффективно
+		//	return
+		//}
 
 		trackLocal := r.addTrack(t, join_url)
 		if trackLocal == nil {

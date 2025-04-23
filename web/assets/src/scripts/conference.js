@@ -44,13 +44,12 @@ function createPeerConnection(){
     state.peerConnection = new RTCPeerConnection(configuration);
 
     state.peerConnection.ontrack = function (event){
-        if (event.track.kind==='audio'){
-            return
-        }
+
         let el = document.createElement(event.track.kind);
         el.srcObject = event.streams[0];
         el.autoplay =true;
         el.controls=false;
+
         document.getElementById("remoteVideos").appendChild(el);
         event.track.onmute = function (event){}
         event.track.onunmute = function (event){
