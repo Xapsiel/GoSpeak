@@ -2,6 +2,7 @@ package http
 
 import (
 	"sync"
+	"time"
 
 	"GoSpeak/internal/config"
 	"GoSpeak/internal/model"
@@ -19,32 +20,53 @@ const (
 )
 
 type Router struct {
-	service   service.Service
-	cfg       config.HostConfig
-	roomslock sync.Mutex
+	service    service.Service
+	cfg        config.HostConfig
+	roomslock  sync.Mutex
+	clientlock sync.Mutex
 	*WebSocket
 	Conference map[string]*model.Conference
 }
 type WebSocket struct {
-	rooms map[string]*Room
+	rooms   map[string]*Room
+	clients map[string]*ChatRoom
 }
-type websocketMessage struct {
+type websocketStreamerMessage struct {
 	Event string `json:"event"`
 	Data  string `json:"data"`
 }
-
+type websocketChatMessage struct {
+	Event        string `json:"event"`
+	Data         string `json:"data"`
+	From         int64  `json:"from"`
+	ConferenceID string `json:"conference_id"`
+}
 type peerConnectionState struct {
 	peerConnection *webrtc.PeerConnection
 	websocket      *threadSafeWriter
 }
 type Room struct {
-	listLock        sync.RWMutex
-	peerConnections []peerConnectionState
-	trackLocals     map[string]*webrtc.TrackLocalStaticRTP
+	listLock         sync.RWMutex
+	signalDebounceMU sync.Mutex
+	pendingSignal    bool
+	peerConnections  []peerConnectionState
+	trackLocals      map[string]*webrtc.TrackLocalStaticRTP
+	lastPLI          time.Time
+}
+type ChatRoom struct {
+	listlock sync.RWMutex
+	conn     map[*websocket.Conn]*threadSafeWriter
 }
 type threadSafeWriter struct {
 	*websocket.Conn
 	sync.Mutex
+	UserID int64
+}
+type RoomStats struct {
+	Participants int
+	Bitrate      uint64
+	CPUUsage     float64
+	TotalBitrate float64
 }
 
 func (t *threadSafeWriter) WriteJSON(v interface{}) error {
@@ -58,7 +80,8 @@ func NewRouter(service service.Service, cfg config.HostConfig) *Router {
 	return &Router{service: service,
 		cfg: cfg,
 		WebSocket: &WebSocket{
-			rooms: make(map[string]*Room),
+			rooms:   make(map[string]*Room),
+			clients: make(map[string]*ChatRoom),
 		},
 	}
 }
@@ -67,7 +90,7 @@ func (r *Router) Routes(app fiber.Router) {
 	app.Static("assets", "web/assets")
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000, http://127.0.0.1:3000",
+		AllowOrigins:     "http://192.168.0.100:3000, http://127.0.0.1:3000",
 		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: true,
@@ -91,7 +114,8 @@ func (r *Router) Routes(app fiber.Router) {
 	conference.Post("/create", r.CreateConferenceHandler)
 	conference.Get("/join", r.JoinConferenceHandler)
 
-	app.Get("/ws", websocket.New(r.WebSocketHandler))
+	app.Get("/ws/stream", websocket.New(r.WebSocketStreamerHandler))
+	app.Get("/ws/chat", websocket.New(r.WebSocketChatHandler))
 	go r.cleanupRooms()
 }
 

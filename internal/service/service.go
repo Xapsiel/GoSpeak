@@ -38,7 +38,7 @@ type Conference interface {
 }
 
 type Participant interface {
-	AddToConference(u int64, conf *model.Conference) error
+	AddToConference(u int64, conf string) error
 	RemoveFromConference(id int64) error
 	GetParticipantsByConferenceID(id string) ([]int64, error)
 }

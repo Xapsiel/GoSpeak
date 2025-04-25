@@ -1,7 +1,6 @@
 package service
 
 import (
-	"GoSpeak/internal/model"
 	"GoSpeak/internal/repository"
 )
 
@@ -23,6 +22,6 @@ func NewParticipantService(repo repository.Participant) *ParticipantService {
 		repo: repo,
 	}
 }
-func (s *ParticipantService) AddToConference(u int64, conf *model.Conference) error {
+func (s *ParticipantService) AddToConference(u int64, conf string) error {
 	return s.repo.AddToConference(u, conf)
 }

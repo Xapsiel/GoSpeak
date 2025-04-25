@@ -19,7 +19,7 @@ func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 
 	}
 	u := c.Locals("user_id").(int64)
-	err = r.service.Participant.AddToConference(u, conf)
+	err = r.service.Participant.AddToConference(u, conf.ConferenceID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Неверный формат данных")
 	}

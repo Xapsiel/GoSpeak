@@ -5,7 +5,8 @@ const state = {
     peerConnection : null,
     localStream: null,
     remoteStreams: new Map(),
-    ws: null,
+    streamWS: null,
+    chatWS: null,
     conferenceId: null,
     userId: null
 }
@@ -17,15 +18,15 @@ const configuration = {
                 // "stun:global.stun.twilio.com:3478"
             ]
         },
-        {
-            urls: [
-                // "turn:relay1.expressturn.com:3478?transport=udp",
-                "turn:relay1.expressturn.com:3478?transport=tcp",
-                // "turns:relay1.expressturn.com:5349?transport=tcp"
-            ],
-            username: "ef47B9MOBBMFPVPIJO",
-            credential: "9BZOLQ3r6Lxa9qTL"
-        }
+        // {
+        //     urls: [
+        //         // "turn:relay1.expressturn.com:3478?transport=udp",
+        //         "turn:relay1.expressturn.com:3478?transport=tcp",
+        //         // "turns:relay1.expressturn.com:5349?transport=tcp"
+        //     ],
+        //     username: "ef47B9MOBBMFPVPIJO",
+        //     credential: "9BZOLQ3r6Lxa9qTL"
+        // }
     ]
 };
 
@@ -41,6 +42,7 @@ async function initLocalStream(){
 }
 
 function createPeerConnection(){
+
     state.peerConnection = new RTCPeerConnection(configuration);
 
     state.peerConnection.ontrack = function (event){
@@ -67,25 +69,24 @@ function createPeerConnection(){
         if (!e.candidate){
             return;
         }
-        state.ws.send(JSON.stringify({event: 'candidate', data: JSON.stringify(e.candidate)}));
+        state.streamWS.send(JSON.stringify({event: 'candidate', data: JSON.stringify(e.candidate)}));
     }
 }
-
-function  setupWebSocket(){
-    const params = new URLSearchParams(window.location.search);
-    const joinUrl = params.get('join_url');
-    console.log(joinUrl)
-    state.ws = new WebSocket(`ws://${domain}/ws?join_url=${joinUrl}`);
-    state.ws.onopen = async () => {
-        sendWSMessage({event: 'join', conference_id: conference.id, user_id: auth.user.user_id});
-    };
-    state.ws.onclose  = function(event){
+async function setupStreamWebSocket(joinUrl){
+    await initLocalStream();
+    if (state.localStream){
+        await createPeerConnection();
+    }else{
+        return
+    }
+    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}`);
+    state.streamWS.onclose  = function(event){
         window.alert("websocket has closed");
     }
-    state.ws.onerror=function (event){
+    state.streamWS.onerror=function (event){
         console.log("ERROR: "+event.data)
     }
-    state.ws.onmessage = function (event){
+    state.streamWS.onmessage = function (event){
         let msg = JSON.parse(event.data);
         if (!msg){
             return console.log("failed to parse msg")
@@ -106,7 +107,7 @@ function  setupWebSocket(){
                 state.peerConnection.setRemoteDescription(offer);
                 state.peerConnection.createAnswer().then(answer=>{
                     state.peerConnection.setLocalDescription(answer);
-                    state.ws.send(JSON.stringify({event: "answer", data: JSON.stringify(answer)}))
+                    state.streamWS.send(JSON.stringify({event: "answer", data: JSON.stringify(answer)}))
                 })
                 return
             case "candidate":
@@ -118,6 +119,64 @@ function  setupWebSocket(){
         }
     }
 }
+function sendMessage() {
+    const input = document.getElementById("chatInput");
+    if (!input.value.trim() || !auth.user || !state.chatWS || state.chatWS.readyState !== WebSocket.OPEN) return;
+
+    const messageData = {
+        event: "message",
+        conference_id: conference.id,
+        from: auth.user.user_id,
+        data: input.value,
+    };
+
+    const chatMessages = document.getElementById("chatMessages");
+    const message = document.createElement("div");
+    message.classList.add("chat-message");
+    message.textContent = `${auth.user.user_id}: ${input.value}`;
+    chatMessages.appendChild(message);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    state.chatWS.send(JSON.stringify(messageData));
+    input.value = "";
+}
+function handleNewMessage(from, content ) {
+    const chatMessages = document.getElementById("chatMessages");
+    const message = document.createElement("div");
+    message.classList.add("chat-message");
+    message.textContent = `${from}: ${content}`;
+    chatMessages.appendChild(message);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+async function setupChatWebSocket(joinUrl){
+    state.chatWS = new WebSocket(`ws://${domain}/ws/chat?join_url=${joinUrl}`);
+    state.chatWS.onopen = async ()=>{
+        sendChatWSMessage({event:"join", conference_id: conference.id, from: auth.user.user_id,})
+    }
+    state.chatWS.onmessage=function (event){
+        let msg = JSON.parse(event.data);
+        if (!msg){
+            return console.log("failed to parse msg")
+        }
+        switch (msg.event){
+            case "join":
+                console.log(`user ${msg.from} joined in ${msg.conference_id}`);
+                return
+            case "message":
+                handleNewMessage(msg.from,msg.data);
+                return
+        }
+    }
+
+}
+function  setupWebSocket(){
+    const params = new URLSearchParams(window.location.search);
+    const joinUrl = params.get('join_url');
+    setupStreamWebSocket(joinUrl);
+
+    setupChatWebSocket(joinUrl);
+
+}
 
 async function handleOffer(offer){
     await state.peerConnection.setRemoteDescription(offer);
@@ -128,8 +187,13 @@ async function handleOffer(offer){
     );
 }
 function sendWSMessage(message){
-    if (state.ws.readyState===WebSocket.OPEN){
-        state.ws.send(JSON.stringify(message));
+    if (state.streamWS.readyState===WebSocket.OPEN){
+        state.streamWS.send(JSON.stringify(message));
+    }
+}
+function sendChatWSMessage(message){
+    if (state.chatWS.readyState===WebSocket.OPEN){
+        state.chatWS.send(JSON.stringify(message));
     }
 }
 function handleNewParticipant(userId) {
@@ -244,9 +308,10 @@ function initializeUser() {
     }
     return Promise.resolve();
 }
+document.getElementById("sendMessage").addEventListener("click", sendMessage);
+
 async function initConference() {
-    await initLocalStream();
-    await createPeerConnection();
+
 
     setupWebSocket();
 
@@ -254,7 +319,7 @@ async function initConference() {
 
 function cleanup() {
     state.peerConnection?.close();
-    state.ws?.close();
+    state.streamWS?.close();
     state.localStream?.getTracks().forEach(track => track.stop());
     state.remoteStreams.forEach(stream => stream.getTracks().forEach(track => track.stop()));
 }

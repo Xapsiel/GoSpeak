@@ -3,8 +3,6 @@ package repository
 import (
 	"time"
 
-	"GoSpeak/internal/model"
-
 	"github.com/jmoiron/sqlx"
 )
 
@@ -18,7 +16,7 @@ func NewParticipantRepository(db *sqlx.DB) *ParticipantRepository {
 	}
 }
 
-func (r *ParticipantRepository) AddToConference(u int64, conf *model.Conference) error {
+func (r *ParticipantRepository) AddToConference(u int64, conf string) error {
 	query := `
 
 		INSERT INTO 
@@ -33,10 +31,7 @@ func (r *ParticipantRepository) AddToConference(u int64, conf *model.Conference)
 	
 			`
 	role := "participant"
-	if (u) == conf.CreatorID {
-		role = "host"
-	}
-	_, err := r.db.Exec(query, conf.ConferenceID, u, role, time.Now())
+	_, err := r.db.Exec(query, conf, u, role, time.Now())
 	if err != nil {
 		return err
 	}

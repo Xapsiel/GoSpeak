@@ -2,8 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"sync"
 	"time"
+
+	"GoSpeak/internal/model"
 
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/gofiber/websocket/v2"
@@ -12,22 +16,35 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-func (r *Router) removeTrack(t *webrtc.TrackLocalStaticRTP, join_url string) {
-	r.rooms[join_url].listLock.Lock()
+var Config = webrtc.Configuration{
+	ICEServers: []webrtc.ICEServer{
+		webrtc.ICEServer{
+			URLs: []string{"stun:stun.l.google.com:19302"},
+		},
+	},
+}
+var rtpBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 1450)
+	},
+}
+
+func (r *Router) removeTrack(t *webrtc.TrackLocalStaticRTP, joinUrl string) {
+	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
-		r.rooms[join_url].listLock.Unlock()
-		r.signalPeerConnections(join_url)
+		r.rooms[joinUrl].listLock.Unlock()
+		r.signalPeerConnections(joinUrl)
 	}()
 
-	delete(r.rooms[join_url].trackLocals, t.ID())
+	delete(r.rooms[joinUrl].trackLocals, t.ID())
 }
-func (r *Router) addTrack(t *webrtc.TrackRemote, join_url string) *webrtc.TrackLocalStaticRTP {
-	r.rooms[join_url].listLock.Lock()
+func (r *Router) addTrack(t *webrtc.TrackRemote, joinUrl string) *webrtc.TrackLocalStaticRTP {
+	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
-		r.rooms[join_url].listLock.Unlock()
-		r.signalPeerConnections(join_url)
+		r.rooms[joinUrl].listLock.Unlock()
+		r.signalPeerConnections(joinUrl)
 	}()
-	if existingTrack, ok := r.rooms[join_url].trackLocals[t.ID()]; ok {
+	if existingTrack, ok := r.rooms[joinUrl].trackLocals[t.ID()]; ok {
 		return existingTrack
 	}
 
@@ -37,22 +54,26 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, join_url string) *webrtc.TrackL
 		panic(err)
 	}
 
-	r.rooms[join_url].trackLocals[t.ID()] = trackLocal
+	r.rooms[joinUrl].trackLocals[t.ID()] = trackLocal
 	return trackLocal
 }
-func (r *Router) dispatchKeyFrame(join_url string) {
-	r.rooms[join_url].listLock.Lock()
-	defer r.rooms[join_url].listLock.Unlock()
+func (r *Router) dispatchKeyFrame(joinUrl string) {
+	r.rooms[joinUrl].listLock.Lock()
+	defer r.rooms[joinUrl].listLock.Unlock()
+	//if time.Since(r.rooms[joinUrl].lastPLI) < 2*time.Second {
+	//	return
+	//}
+	//r.rooms[joinUrl].lastPLI = time.Now()
 
-	for i := range r.rooms[join_url].peerConnections {
-		for _, receiver := range r.rooms[join_url].peerConnections[i].peerConnection.GetReceivers() {
+	for i := range r.rooms[joinUrl].peerConnections {
+		for _, receiver := range r.rooms[joinUrl].peerConnections[i].peerConnection.GetReceivers() {
 			if receiver.Track() == nil {
 				continue
 			}
 			if receiver.Track() == nil {
 				continue
 			}
-			_ = r.rooms[join_url].peerConnections[i].peerConnection.WriteRTCP([]rtcp.Packet{
+			_ = r.rooms[joinUrl].peerConnections[i].peerConnection.WriteRTCP([]rtcp.Packet{
 				&rtcp.PictureLossIndication{
 					MediaSSRC: uint32(receiver.Track().SSRC()),
 				},
@@ -61,43 +82,49 @@ func (r *Router) dispatchKeyFrame(join_url string) {
 	}
 }
 
-func (r *Router) signalPeerConnections(join_url string) {
-	r.rooms[join_url].listLock.Lock()
+func (r *Router) signalPeerConnections(joinUrl string) {
+	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
-		r.rooms[join_url].listLock.Unlock()
-		// Откладываем key frame запросы
-		time.AfterFunc(100*time.Millisecond, func() {
-			r.dispatchKeyFrame(join_url)
-		})
+		r.rooms[joinUrl].listLock.Unlock()
+
 	}()
-
-	// Упрощенная и более эффективная логика синхронизации
-	var wg sync.WaitGroup
-	for i := 0; i < len(r.rooms[join_url].peerConnections); i++ {
-		if r.rooms[join_url].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-			r.rooms[join_url].peerConnections = append(r.rooms[join_url].peerConnections[:i], r.rooms[join_url].peerConnections[i+1:]...)
-			i--
-			continue
-		}
-
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			r.signalPeer(join_url, idx)
-		}(i)
+	if r.rooms[joinUrl].pendingSignal {
+		return
 	}
-	wg.Wait()
+	r.rooms[joinUrl].pendingSignal = true
+	time.AfterFunc(500*time.Millisecond, func() {
+		defer func() {
+			r.rooms[joinUrl].pendingSignal = false
+		}()
+		var wg sync.WaitGroup
+		for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
+			if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+				r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
+				i--
+				continue
+			}
+
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				r.signalPeer(joinUrl, idx)
+			}(i)
+		}
+		time.AfterFunc(100*time.Millisecond, func() {
+			r.dispatchKeyFrame(joinUrl)
+		})
+		wg.Wait()
+	})
 }
 
-func (r *Router) signalPeer(join_url string, idx int) {
-	pcState := r.rooms[join_url].peerConnections[idx]
+func (r *Router) signalPeer(joinUrl string, idx int) {
+	pcState := r.rooms[joinUrl].peerConnections[idx]
 
-	// Оптимизация: собираем все изменения перед созданием offer
 	existingSenders := make(map[string]bool)
 	for _, sender := range pcState.peerConnection.GetSenders() {
 		if sender.Track() != nil {
 			existingSenders[sender.Track().ID()] = true
-			if _, ok := r.rooms[join_url].trackLocals[sender.Track().ID()]; !ok {
+			if _, ok := r.rooms[joinUrl].trackLocals[sender.Track().ID()]; !ok {
 				if err := pcState.peerConnection.RemoveTrack(sender); err != nil {
 					return
 				}
@@ -105,9 +132,9 @@ func (r *Router) signalPeer(join_url string, idx int) {
 		}
 	}
 
-	for trackID := range r.rooms[join_url].trackLocals {
+	for trackID := range r.rooms[joinUrl].trackLocals {
 		if !existingSenders[trackID] {
-			if _, err := pcState.peerConnection.AddTrack(r.rooms[join_url].trackLocals[trackID]); err != nil {
+			if _, err := pcState.peerConnection.AddTrack(r.rooms[joinUrl].trackLocals[trackID]); err != nil {
 				return
 			}
 		}
@@ -128,27 +155,128 @@ func (r *Router) signalPeer(join_url string, idx int) {
 		return
 	}
 
-	if err = pcState.websocket.WriteJSON(&websocketMessage{
+	if err = pcState.websocket.WriteJSON(&websocketStreamerMessage{
 		Event: "offer",
 		Data:  string(offerString),
 	}); err != nil {
 		log.Errorf("Failed to send offer: %v", err)
 	}
 }
-func (r *Router) WebSocketHandler(ws *websocket.Conn) {
-	join_url := ws.Query("join_url", "error")
-	if join_url == "error" {
+
+func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
+	joinUrl := ws.Query("join_url", "error")
+	if joinUrl == "error" {
 		return
 	}
-	if _, ok := r.rooms[join_url]; !ok {
-		r.rooms[join_url] = &Room{
+	if _, ok := r.clients[joinUrl]; !ok {
+		r.clients[joinUrl] = &ChatRoom{
+			listlock: sync.RWMutex{},
+			conn:     make(map[*websocket.Conn]*threadSafeWriter),
+		}
+	}
+	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}}
+	defer c.Close()
+	message := &websocketChatMessage{}
+	for {
+		_, raw, err := c.ReadMessage()
+		if err != nil {
+			//log.Errorf("Failed to read message: %v", err)
+			return
+		}
+
+		log.Infof("Got message: %s", raw)
+
+		if err := json.Unmarshal(raw, &message); err != nil {
+			log.Errorf("Failed to unmarshal json to message: %v", err)
+			return
+		}
+
+		switch message.Event {
+		case "join":
+			slog.Info(fmt.Sprintf("User %d joined in %s", message.From, message.ConferenceID))
+			r.clientlock.Lock()
+			if _, ok := r.clients[message.ConferenceID]; !ok {
+				r.clients[message.ConferenceID] = &ChatRoom{
+					listlock: sync.RWMutex{},
+					conn:     make(map[*websocket.Conn]*threadSafeWriter),
+				}
+			}
+			c.UserID = message.From
+			r.clients[message.ConferenceID].conn[ws] = c
+			r.clientlock.Unlock()
+			err = r.service.AddToConference(message.From, message.ConferenceID)
+			if err != nil {
+				slog.Error(err.Error())
+			}
+		case "message":
+			err = r.service.Message.Send(&model.Message{
+				ConferenceID: message.ConferenceID,
+				SenderID:     message.From,
+				Content:      message.Data,
+				ContentType:  "text",
+			})
+			if err != nil {
+				slog.Error(err.Error())
+			}
+			for _, el := range r.clients[message.ConferenceID].conn {
+				if el.UserID != message.From {
+					err = el.Conn.WriteMessage(websocket.TextMessage, raw)
+					if err != nil {
+						slog.Error(err.Error())
+					}
+				}
+			}
+
+		}
+	}
+}
+func (r *Router) createPeerConnection() (*webrtc.PeerConnection, error) {
+	m := webrtc.MediaEngine{}
+
+	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeVP8,
+			ClockRate: 90000,
+			Channels:  0,
+		},
+		PayloadType: 96,
+	}, webrtc.RTPCodecTypeVideo); err != nil {
+		return nil, err
+	}
+
+	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeOpus,
+			ClockRate: 48000,
+			Channels:  2,
+		},
+		PayloadType: 111,
+	}, webrtc.RTPCodecTypeAudio); err != nil {
+		return nil, err
+	}
+
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
+	return api.NewPeerConnection(webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{webrtc.ICEServer{
+			URLs: []string{"stun:stun.l.google.com:19302"},
+		}},
+		SDPSemantics: webrtc.SDPSemanticsUnifiedPlan,
+	})
+}
+func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
+	joinUrl := ws.Query("join_url", "error")
+	if joinUrl == "error" {
+		return
+	}
+	if _, ok := r.rooms[joinUrl]; !ok {
+		r.rooms[joinUrl] = &Room{
 			trackLocals:     make(map[string]*webrtc.TrackLocalStaticRTP),
 			peerConnections: make([]peerConnectionState, 0),
 		}
 	}
 	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}}
 	defer c.Close()
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
+	peerConnection, err := r.createPeerConnection()
 	if err != nil {
 		log.Errorf("Failed to creates a PeerConnection: %v", err)
 		return
@@ -162,9 +290,9 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 			return
 		}
 	}
-	r.rooms[join_url].listLock.Lock()
-	r.rooms[join_url].peerConnections = append(r.rooms[join_url].peerConnections, peerConnectionState{peerConnection: peerConnection, websocket: c})
-	r.rooms[join_url].listLock.Unlock()
+	r.rooms[joinUrl].listLock.Lock()
+	r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections, peerConnectionState{peerConnection: peerConnection, websocket: c})
+	r.rooms[joinUrl].listLock.Unlock()
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i == nil {
 			return
@@ -174,9 +302,9 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 			log.Errorf("Failed to marshal candidate to json: %v", err)
 			return
 		}
-		r.rooms[join_url].listLock.Lock()
-		defer r.rooms[join_url].listLock.Unlock()
-		if err = c.WriteJSON(&websocketMessage{
+		r.rooms[joinUrl].listLock.Lock()
+		defer r.rooms[joinUrl].listLock.Unlock()
+		if err = c.WriteJSON(&websocketStreamerMessage{
 			Event: "candidate",
 			Data:  string(candidateString),
 		}); err != nil {
@@ -192,27 +320,26 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 				log.Errorf("Failed to close PeerConnection: %v", err)
 			}
 		case webrtc.PeerConnectionStateClosed:
-			r.signalPeerConnections(join_url)
+			r.signalPeerConnections(joinUrl)
 		default:
 		}
 	})
 	peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 		log.Infof("Got remote track: Kind=%s, ID=%s", t.Kind(), t.ID())
 
-		// Для аудио треков можно использовать более легковесную обработку
-		//if t.Kind() == webrtc.RTPCodecTypeAudio {
-		//	// Пропускаем аудио треки или обрабатываем их более эффективно
+		//if t.Kind() == webrtc.RTPCodecTypeAudio{
 		//	return
 		//}
 
-		trackLocal := r.addTrack(t, join_url)
+		trackLocal := r.addTrack(t, joinUrl)
 		if trackLocal == nil {
 			return
 		}
-		defer r.removeTrack(trackLocal, join_url)
+		defer r.removeTrack(trackLocal, joinUrl)
 
 		// Используем буфер оптимального размера
-		buf := make([]byte, 1450) // MTU typical size
+		buf := rtpBufferPool.Get().([]byte)
+		defer rtpBufferPool.Put(buf)
 		rtpPkt := &rtp.Packet{}
 
 		for {
@@ -237,8 +364,8 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 	peerConnection.OnICEConnectionStateChange(func(is webrtc.ICEConnectionState) {
 		log.Infof("ICE connection state changed: %s", is)
 	})
-	r.signalPeerConnections(join_url)
-	message := &websocketMessage{}
+	r.signalPeerConnections(joinUrl)
+	message := &websocketStreamerMessage{}
 	for {
 		_, raw, err := c.ReadMessage()
 		if err != nil {
@@ -280,6 +407,7 @@ func (r *Router) WebSocketHandler(ws *websocket.Conn) {
 				log.Errorf("Failed to set remote description: %v", err)
 				return
 			}
+
 		default:
 			log.Errorf("unknown message: %+v", message)
 		}
@@ -347,7 +475,7 @@ func (r *Router) cleanupRooms() {
 //			return
 //		}
 //
-//		msg := websocketMessage{
+//		msg := websocketStreamerMessage{
 //			Event: "candidate",
 //			Data:  candidateJSON,
 //		}
@@ -389,7 +517,7 @@ func (r *Router) cleanupRooms() {
 //	})
 //
 //	for {
-//		var msg websocketMessage
+//		var msg websocketStreamerMessage
 //		if err := c.ReadJSON(&msg); err != nil {
 //			ws.log.Errorf("Websocket read error: %v", err)
 //			break
@@ -425,7 +553,7 @@ func (r *Router) cleanupRooms() {
 //				continue
 //			}
 //
-//			resp := websocketMessage{
+//			resp := websocketStreamerMessage{
 //				Event: "answer",
 //				Data:  answerJSON,
 //			}

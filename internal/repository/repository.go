@@ -33,7 +33,7 @@ type Conference interface {
 	GetConference(join_url string) (*model.Conference, error)
 }
 type Participant interface {
-	AddToConference(u int64, conf *model.Conference) error
+	AddToConference(u int64, conf string) error
 	RemoveFromConference(id int64) error
 	GetParticipantsByConferenceID(id string) ([]int64, error)
 }
