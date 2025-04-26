@@ -126,9 +126,7 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 			}
 		}
 	}
-	r.rooms[joinUrl].listLock.Unlock()
 
-	r.rooms[joinUrl].listLock.Lock()
 	trackLocalsCopy := make(map[string]*webrtc.TrackLocalStaticRTP, len(r.rooms[joinUrl].trackLocals))
 	for k, v := range r.rooms[joinUrl].trackLocals {
 		trackLocalsCopy[k] = v
