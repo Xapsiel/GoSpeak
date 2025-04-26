@@ -70,9 +70,15 @@
 
             <div class="conference-content">
                 <div class="video-section">
-                    <div id="remoteVideos" class="video-grid"></div>
+                    <div class="video-grid grid-mode">
+
+                        <div id="remoteVideos">
+
+                        </div>
+                        <!-- Удаленные видео будут добавлены динамически -->
+                    </div>
                 </div>
-                
+
                 <div class="chat-section">
                     <div class="chat-header">
                         <h3>Чат</h3>
@@ -304,7 +310,7 @@
     border-radius: 1.5rem;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
     width: 100%;
-    max-width: 1200px;
+    max-width: 95%;
     margin: 0 auto;
     padding: 2rem;
     position: relative;
@@ -478,16 +484,16 @@
     .conference-content {
         flex-direction: column;
     }
-    
+
     .chat-section {
         width: 100%;
         height: 300px;
     }
-    
+
     .video-section {
         min-height: 300px;
     }
-    
+
     .conference-controls {
         justify-content: center;
     }

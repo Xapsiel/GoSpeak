@@ -62,9 +62,6 @@ func (r *UserRepository) SignIn(email string, password string) (*model.User, err
 		}
 		return nil, err
 	}
-	//for rows.Next() {
-	//
-	//}/
 	return &u, nil
 
 }

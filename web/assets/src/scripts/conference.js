@@ -15,18 +15,9 @@ const configuration = {
         {
             urls: [
                 "stun:stun.l.google.com:19302",
-                // "stun:global.stun.twilio.com:3478"
             ]
         },
-        // {
-        //     urls: [
-        //         // "turn:relay1.expressturn.com:3478?transport=udp",
-        //         "turn:relay1.expressturn.com:3478?transport=tcp",
-        //         // "turns:relay1.expressturn.com:5349?transport=tcp"
-        //     ],
-        //     username: "ef47B9MOBBMFPVPIJO",
-        //     credential: "9BZOLQ3r6Lxa9qTL"
-        // }
+
     ]
 };
 
@@ -51,7 +42,7 @@ function createPeerConnection(){
         el.srcObject = event.streams[0];
         el.autoplay =true;
         el.controls=false;
-
+        el.className="remoteVideo";
         document.getElementById("remoteVideos").appendChild(el);
         event.track.onmute = function (event){}
         event.track.onunmute = function (event){
@@ -63,7 +54,6 @@ function createPeerConnection(){
             }
         }
     }
-    // document.getElementById('localVideo').srcObject = state.localStream;
     state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track,state.localStream))
     state.peerConnection.onicecandidate = e =>{
         if (!e.candidate){
@@ -225,19 +215,73 @@ const conference = {
     id: 0,
     creator_id: 0,
     join_url: "",
-    participants: new Map(), // участники конференции
+    participants: new Map(),
 };
 
+class RemoteVideoManager {
+    constructor() {
+        this.videoGrid = document.querySelector('.video-grid');
+        this.currentMode = 'grid';
+        this.setupModeToggle();
+    }
 
+    setupModeToggle() {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn btn-icon';
+        toggleBtn.innerHTML = '<i class="fas fa-th-large"></i>';
+        toggleBtn.title = 'Переключить режим отображения';
+        toggleBtn.onclick = () => this.toggleDisplayMode();
+        
+        document.querySelector('.conference-controls').appendChild(toggleBtn);
+    }
 
+    toggleDisplayMode() {
+        this.currentMode = this.currentMode === 'grid' ? 'focus' : 'grid';
+        this.videoGrid.classList.toggle('focus-mode');
+        this.videoGrid.classList.toggle('grid-mode');
+        
+        if (this.currentMode === 'grid') {
+            const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
+            if (activeVideo) {
+                activeVideo.classList.remove('active');
+            }
+        }
+    }
 
+    createRemoteVideoContainer(peerId, userName) {
+        const container = document.createElement('div');
+        container.className = 'remote-video-container';
+        container.dataset.peerId = peerId;
+        
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        
+        const nameLabel = document.createElement('div');
+        nameLabel.className = 'user-name';
+        nameLabel.textContent = userName;
+        
+        container.appendChild(video);
+        container.appendChild(nameLabel);
+        
+        container.onclick = () => {
+            if (this.currentMode === 'focus') {
+                const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
+                if (activeVideo) {
+                    activeVideo.classList.remove('active');
+                }
+                container.classList.add('active');
+            }
+        };
+        
+        this.videoGrid.appendChild(container);
+        return container;
+    }
+}
 
+document.addEventListener('DOMContentLoaded', () => {
+    window.remoteVideoManager = new RemoteVideoManager();
 
-
-
-
-
-document.addEventListener("DOMContentLoaded", () => {
     const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
 
@@ -246,7 +290,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initializeUser().then(() => {
         if (joinUrl) {
-            // Запрос на вход в конференцию
             axiosInstance.get(`/conference/join?join_url=${joinUrl}`, {
                 headers: { Authorization: `Bearer ${auth.token}` }
             }).then(response => {
@@ -325,4 +368,15 @@ function cleanup() {
 }
 
 window.addEventListener('beforeunload', () => {
+});
+
+const chatSection = document.querySelector('.chat-section');
+const videoSection = document.querySelector('.video-section');
+
+chatSection.addEventListener('mouseenter', () => {
+    videoSection.classList.add('chat-open');
+});
+
+chatSection.addEventListener('mouseleave', () => {
+    videoSection.classList.remove('chat-open');
 });

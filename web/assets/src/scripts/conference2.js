@@ -130,7 +130,7 @@ const conference = {
     id: 0,
     creator_id: 0,
     join_url: "",
-    participants: new Map(), // участники конференции
+    participants: new Map(),
 };
 
 
@@ -151,7 +151,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initializeUser().then(() => {
         if (joinUrl) {
-            // Запрос на вход в конференцию
             axiosInstance.get(`/conference/join?join_url=${joinUrl}`, {
                 headers: { Authorization: `Bearer ${auth.token}` }
             }).then(response => {

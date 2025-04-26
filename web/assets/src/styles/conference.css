@@ -1,190 +1,177 @@
 /* Основные стили */
-:root {
-    --primary-color: #4A90E2;
-    --secondary-color: #2C3E50;
-    --accent-color: #E74C3C;
-    --background-color: #F5F7FA;
-    --text-color: #2C3E50;
-    --border-radius: 10px;
-    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+.conference-container {
+    min-height: 100vh;
+    background: #1a1d23;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-body {
-    background-color: var(--background-color);
-    color: var(--text-color);
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-}
-
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* Основной контейнер конференции */
-.conference {
-    background: #ffffff;
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    max-width: 800px;
-    width: 100%;
-    margin: 50px auto;
-    border: 3px solid #007bff;
-}
-
-.conference h2 {
-    color: #007bff;
-    font-size: 26px;
-    font-weight: bold;
-    margin-bottom: 20px;
-}
-
-/* Секция видео */
-.video-section {
+.conference-room {
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 10px;
+    background: #1a1d23;
 }
 
-video {
-    max-width: 100%;
-    border-radius: 8px;
-    border: 2px solid #007bff;
+/* Видео контейнер */
+.video-section {
+    flex: 1;
+    padding: 20px;
+    transition: margin 0.3s ease;
+    margin-right: 0;
 }
 
-/* Чат */
+.video-section.chat-open {
+    margin-right: 350px;
+}
+
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding: 10px;
+}
+
+/* Стили для чата */
 .chat-section {
-    background: #f8f9fa;
+    position: fixed;
+    top: 0;
+    right: -350px;
+    bottom: 0;
+    width: 350px;
+    background: #2d3138;
+    box-shadow: -5px 0 15px rgba(0,0,0,0.2);
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-section:hover {
+    right: 0;
+}
+
+/* Заголовок чата */
+.chat-header {
     padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-    max-width: 350px;
-    width: 100%;
+    background: #25282e;
+    border-bottom: 1px solid #3a3f48;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
+.chat-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 16px;
+}
+
+/* Контейнер сообщений */
 .chat-messages {
-    background: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background: #1e2128;
 }
 
-#chatInput {
-    margin-top: 10px;
+/* Элементы управления */
+.conference-controls {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 15px;
+    background: rgba(45, 49, 56, 0.9);
+    padding: 12px 25px;
+    border-radius: 50px;
+    backdrop-filter: blur(10px);
+    z-index: 1001;
 }
 
-#sendMessage {
-    margin-top: 10px;
-}
-
-/* Стили для создания конференции */
-.conference-create .card {
-    background: #ffffff;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    max-width: 600px;
-    width: 100%;
-    margin: 50px auto;
-    border: 3px solid #007bff;
-}
-
-.conference-create h2 {
-    color: #007bff;
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 15px;
-}
-
-/* Поля формы */
-.conference-create .form-group {
-    margin-bottom: 15px;
-    text-align: left;
-}
-
-.conference-create label {
-    font-weight: bold;
-    color: #555;
-}
-
-.conference-create input {
-    width: 100%;
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-}
-
-/* Кнопки */
-#createConferenceButton {
-    background: #007bff;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    width: 100%;
-    margin-top: 10px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-#createConferenceButton:hover {
-    background: #0069d9;
-}
-
-#endCallButton {
-    background: #dc3545;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    width: 100%;
-    margin-top: 10px;
-    cursor: pointer;
-    transition: 0.3s;
-}
-
-#endCallButton:hover {
-    background: #c82333;
-}
-
-/* Скрытие элементов */
-.d-none {
-    display: none !important;
-}
-
-/* Адаптивный дизайн */
-@media (max-width: 992px) {
-    .d-flex {
-        flex-direction: column;
-    }
-
-    .video-section {
+/* Адаптивные стили */
+@media (max-width: 768px) {
+    .video-section.chat-open {
         margin-right: 0;
-        margin-bottom: 2rem;
     }
 
     .chat-section {
         width: 100%;
+        right: -100%;
     }
 }
 
+/* Стили для видео элементов */
+.video-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+    aspect-ratio: 16/9;
+}
+
+.video-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-container:hover {
+    transform: scale(1.02);
+    z-index: 100;
+}
+
+/* Индикатор пользователя */
+.user-indicator {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    color: white;
+    font-size: 14px;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Чат инпут */
+.chat-input-container {
+    padding: 15px;
+    background: #25282e;
+    border-top: 1px solid #3a3f48;
+}
+
+.chat-input {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 20px;
+    background: #1e2128;
+    color: #fff;
+    outline: none;
+}
+.remoteVideos{
+        display: flex;
+        flex-wrap: wrap; /* ключевое свойство для переноса */
+        gap: 5%; /* опционально: расстояние между элементами */
+}
+.chat-input::placeholder {
+    color: #6c757d;
+}
 /* Анимации */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+@keyframes slideIn {
+    from { right: -350px; }
+    to { right: 0; }
 }
 
-.conference-create,
-.conference {
-    animation: fadeIn 0.3s ease-out;
+@keyframes slideOut {
+    from { right: 0; }
+    to { right: -350px; }
 }

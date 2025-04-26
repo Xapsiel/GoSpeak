@@ -61,7 +61,6 @@ async function isAuthenticated() {
     }
 }
 
-// Выход из системы
 function logout() {
     window.localStorage.removeItem("jwtToken");
     window.localStorage.removeItem("user");
@@ -82,7 +81,6 @@ if (elements.signInBtn) {
     }
 }
 
-// Обработка формы регистрации
 if (elements.signUpBtn) {
     const signupForm = document.querySelector("#signUpForm");
     if (signupForm) {

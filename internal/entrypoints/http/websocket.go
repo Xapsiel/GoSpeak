@@ -48,7 +48,6 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, joinUrl string) *webrtc.TrackLo
 		return existingTrack
 	}
 
-	// Create a new TrackLocal with the same codec as our incoming
 	trackLocal, err := webrtc.NewTrackLocalStaticRTP(t.Codec().RTPCodecCapability, t.ID(), t.StreamID())
 	if err != nil {
 		panic(err)
@@ -60,10 +59,6 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, joinUrl string) *webrtc.TrackLo
 func (r *Router) dispatchKeyFrame(joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer r.rooms[joinUrl].listLock.Unlock()
-	//if time.Since(r.rooms[joinUrl].lastPLI) < 2*time.Second {
-	//	return
-	//}
-	//r.rooms[joinUrl].lastPLI = time.Now()
 
 	for i := range r.rooms[joinUrl].peerConnections {
 		for _, receiver := range r.rooms[joinUrl].peerConnections[i].peerConnection.GetReceivers() {
@@ -119,33 +114,43 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 
 func (r *Router) signalPeer(joinUrl string, idx int) {
 	pcState := r.rooms[joinUrl].peerConnections[idx]
-
+	r.rooms[joinUrl].listLock.Lock()
 	existingSenders := make(map[string]bool)
 	for _, sender := range pcState.peerConnection.GetSenders() {
 		if sender.Track() != nil {
 			existingSenders[sender.Track().ID()] = true
 			if _, ok := r.rooms[joinUrl].trackLocals[sender.Track().ID()]; !ok {
 				if err := pcState.peerConnection.RemoveTrack(sender); err != nil {
-					return
+					log.Errorf("Failed to remove track: %v", err)
 				}
 			}
 		}
 	}
+	r.rooms[joinUrl].listLock.Unlock()
 
-	for trackID := range r.rooms[joinUrl].trackLocals {
+	r.rooms[joinUrl].listLock.Lock()
+	trackLocalsCopy := make(map[string]*webrtc.TrackLocalStaticRTP, len(r.rooms[joinUrl].trackLocals))
+	for k, v := range r.rooms[joinUrl].trackLocals {
+		trackLocalsCopy[k] = v
+	}
+	r.rooms[joinUrl].listLock.Unlock()
+
+	for trackID := range trackLocalsCopy {
 		if !existingSenders[trackID] {
-			if _, err := pcState.peerConnection.AddTrack(r.rooms[joinUrl].trackLocals[trackID]); err != nil {
-				return
+			if _, err := pcState.peerConnection.AddTrack(trackLocalsCopy[trackID]); err != nil {
+				log.Errorf("Failed to add track: %v", err)
 			}
 		}
 	}
 
 	offer, err := pcState.peerConnection.CreateOffer(nil)
 	if err != nil {
+		log.Errorf("Failed to create offer: %v", err)
 		return
 	}
 
 	if err = pcState.peerConnection.SetLocalDescription(offer); err != nil {
+		log.Errorf("Failed to set local description: %v", err)
 		return
 	}
 
@@ -180,7 +185,6 @@ func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
 	for {
 		_, raw, err := c.ReadMessage()
 		if err != nil {
-			//log.Errorf("Failed to read message: %v", err)
 			return
 		}
 
@@ -327,17 +331,12 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	peerConnection.OnTrack(func(t *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
 		log.Infof("Got remote track: Kind=%s, ID=%s", t.Kind(), t.ID())
 
-		//if t.Kind() == webrtc.RTPCodecTypeAudio{
-		//	return
-		//}
-
 		trackLocal := r.addTrack(t, joinUrl)
 		if trackLocal == nil {
 			return
 		}
 		defer r.removeTrack(trackLocal, joinUrl)
 
-		// Используем буфер оптимального размера
 		buf := rtpBufferPool.Get().([]byte)
 		defer rtpBufferPool.Put(buf)
 		rtpPkt := &rtp.Packet{}
@@ -354,7 +353,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 				continue
 			}
 
-			// Минимизируем обработку пакета
 			if err = trackLocal.WriteRTP(rtpPkt); err != nil {
 				log.Infof("Track writing stopped: %v", err)
 				return
@@ -369,7 +367,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	for {
 		_, raw, err := c.ReadMessage()
 		if err != nil {
-			//log.Errorf("Failed to read message: %v", err)
 			return
 		}
 
@@ -414,7 +411,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	}
 }
 
-// Добавляем очистку неиспользуемых комнат
 func (r *Router) cleanupRooms() {
 	for {
 		time.Sleep(5 * time.Minute)
@@ -428,204 +424,3 @@ func (r *Router) cleanupRooms() {
 		r.roomslock.Unlock()
 	}
 }
-
-// Инициализируем в конструкторе Router
-//func NewWebSocket(log logging.LeveledLogger) *WebSocket {
-//	ws := &WebSocket{}
-//
-//	go ws.dispatchKeyFrames()
-//	return ws
-//}
-
-//func (ws *WebSocket) HandleWebsocket(c *websocket.Conn) {
-//	defer func() {
-//		ws.mu.Lock()
-//		defer ws.mu.Unlock()
-//		for i := range ws.peers {
-//			if ws.peers[i].wsConn == c {
-//				ws.peers = append(ws.peers[:i], ws.peers[i+1:]...)
-//				break
-//			}
-//		}
-//		c.Close()
-//	}()
-//
-//	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
-//	if err != nil {
-//		ws.log.Errorf("Failed to create peer connection: %v", err)
-//		return
-//	}
-//	defer peerConnection.Close()
-//
-//	ws.mu.Lock()
-//	ws.peers = append(ws.peers, peerConnectionState{
-//		peerConnection: peerConnection,
-//		wsConn:         c,
-//	})
-//	ws.mu.Unlock()
-//
-//	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-//		if candidate == nil {
-//			return
-//		}
-//
-//		candidateJSON, err := json.Marshal(candidate.ToJSON())
-//		if err != nil {
-//			ws.log.Errorf("Failed to marshal candidate: %v", err)
-//			return
-//		}
-//
-//		msg := websocketStreamerMessage{
-//			Event: "candidate",
-//			Data:  candidateJSON,
-//		}
-//
-//		if err := c.WriteJSON(msg); err != nil {
-//			ws.log.Errorf("Failed to send candidate: %v", err)
-//		}
-//	})
-//
-//	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-//		trackLocal := ws.addTrack(track)
-//		defer ws.removeTrack(trackLocal)
-//
-//		buf := make([]byte, 1500)
-//		rtpPacket := &rtp.Packet{}
-//		for {
-//			n, _, err := track.Read(buf)
-//			if err != nil {
-//				return
-//			}
-//
-//			if err := rtpPacket.Unmarshal(buf[:n]); err != nil {
-//				ws.log.Errorf("Failed to unmarshal RTP packet: %v", err)
-//				continue
-//			}
-//
-//			b, err := rtpPacket.Marshal()
-//			if err != nil {
-//				panic(err)
-//			}
-//			if _, err := trackLocal.Write(b); err != nil {
-//				ws.log.Errorf("Failed to write RTP packet: %v", err)
-//			}
-//		}
-//	})
-//
-//	peerConnection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-//		ws.log.Infof("Connection state changed: %s", state.String())
-//	})
-//
-//	for {
-//		var msg websocketStreamerMessage
-//		if err := c.ReadJSON(&msg); err != nil {
-//			ws.log.Errorf("Websocket read error: %v", err)
-//			break
-//		}
-//
-//		switch msg.Event {
-//		case "offer":
-//			var offer webrtc.SessionDescription
-//			if err := json.Unmarshal(msg.Data, &offer); err != nil {
-//				ws.log.Errorf("Failed to unmarshal offer: %v", err)
-//				continue
-//			}
-//
-//			if err := peerConnection.SetRemoteDescription(offer); err != nil {
-//				ws.log.Errorf("Failed to set remote description: %v", err)
-//				continue
-//			}
-//
-//			answer, err := peerConnection.CreateAnswer(nil)
-//			if err != nil {
-//				ws.log.Errorf("Failed to create answer: %v", err)
-//				continue
-//			}
-//
-//			if err := peerConnection.SetLocalDescription(answer); err != nil {
-//				ws.log.Errorf("Failed to set local description: %v", err)
-//				continue
-//			}
-//
-//			answerJSON, err := json.Marshal(answer)
-//			if err != nil {
-//				ws.log.Errorf("Failed to marshal answer: %v", err)
-//				continue
-//			}
-//
-//			resp := websocketStreamerMessage{
-//				Event: "answer",
-//				Data:  answerJSON,
-//			}
-//
-//			if err := c.WriteJSON(resp); err != nil {
-//				ws.log.Errorf("Failed to send answer: %v", err)
-//			}
-//
-////		case "candidate":
-////			var candidate webrtc.ICECandidateInit
-////			if err := json.Unmarshal(msg.Data, &candidate); err != nil {
-////				ws.log.Errorf("Failed to unmarshal candidate: %v", err)
-////				continue
-////			}
-////
-////			if err := peerConnection.AddICECandidate(candidate); err != nil {
-////				ws.log.Errorf("Failed to add ICE candidate: %v", err)
-////			}
-////		}
-////	}
-////}
-//
-//func (ws *WebSocket) removeTrack(trackLocal *webrtc.TrackLocalStaticRTP) {
-//	ws.mu.Lock()
-//	defer ws.mu.Unlock()
-//
-//	delete(ws.trackLocals, trackLocal.ID())
-//}
-//
-//func (ws *WebSocket) dispatchKeyFrames() {
-//	for range ws.keyframeTicker.C {
-//		ws.mu.RLock()
-//		defer ws.mu.RUnlock()
-//
-//		for _, peer := range ws.peers {
-//			for _, receiver := range peer.peerConnection.GetReceivers() {
-//				if receiver.Track() == nil {
-//					continue
-//				}
-//
-//				_ = peer.peerConnection.WriteRTCP([]rtcp.Packet{
-//					&rtcp.PictureLossIndication{
-//						MediaSSRC: uint32(receiver.Track().SSRC()),
-//					},
-//				})
-//			}
-//		}
-//	}
-//}
-//
-//func (r *Router) WebsocketMiddleware(c *fiber.Ctx) error {
-//	if websocket.IsWebSocketUpgrade(c) {
-//		c.Locals("allowed", true)
-//		return c.Next()
-//	}
-//	return fiber.ErrUpgradeRequired
-//}
-//
-//func (ws *WebSocket) addTrack(track *webrtc.TrackRemote) *webrtc.TrackLocalStaticRTP {
-//	ws.mu.Lock()
-//	defer ws.mu.Unlock()
-//
-//	trackLocal, err := webrtc.NewTrackLocalStaticRTP(
-//		track.Codec().RTPCodecCapability,
-//		track.ID(),
-//		track.StreamID(),
-//	)
-//	if err != nil {
-//		ws.log.Errorf("Failed to create track local: %v", err)
-//		return nil
-//	}
-//
-//	ws.trackLocals[track.ID()] = trackLocal
-//	return trackLocal
-//}
