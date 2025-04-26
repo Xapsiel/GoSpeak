@@ -126,7 +126,6 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 			}
 		}
 	}
-
 	trackLocalsCopy := make(map[string]*webrtc.TrackLocalStaticRTP, len(r.rooms[joinUrl].trackLocals))
 	for k, v := range r.rooms[joinUrl].trackLocals {
 		trackLocalsCopy[k] = v
