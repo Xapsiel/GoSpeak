@@ -191,7 +191,6 @@
     transform: translateX(3px);
 }
 
-/* Стили для страницаы конференции */
 .conference-room {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
@@ -265,8 +264,8 @@
     display: contents;
 }
 .remoteVideo {
-    flex: 1 1 300px; /* Базовый размер 300px с возможностью роста */
-    max-width: inherit; /* Максимальный размер элемента */
+    flex: 1 1 300px;
+    max-width: inherit;
     min-height: 200px;
     background: #1a202c;
     border-radius: 0.5rem;
@@ -279,7 +278,7 @@
 }
 @media (max-width: 1200px) {
     .remoteVideo {
-        flex-basis: calc(50% - 1rem); /* Учитываем gap */
+        flex-basis: calc(50% - 1rem);
         max-width: calc(50% - 1rem);
     }
 }
@@ -474,7 +473,6 @@
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Стили для сетки видео */
 #remoteVideos {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -485,7 +483,6 @@
 
 
 
-/* Стили для состояния отключенной камеры */
 .video-off {
     position: relative;
     background-color: #1a1a1a;
@@ -503,7 +500,6 @@
     color: rgba(255, 255, 255, 0.5);
 }
 
-/* Анимация появления видео */
 @keyframes fadeIn {
     from {
         opacity: 0;

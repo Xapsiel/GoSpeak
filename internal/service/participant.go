@@ -12,6 +12,9 @@ func (s *ParticipantService) GetParticipantsByConferenceID(id string) ([]int64, 
 	return s.repo.GetParticipantsByConferenceID(id)
 
 }
+func (s *ParticipantService) IsUserInConf(u int64) ([]string, error) {
+	return s.repo.IsUserInConf(u)
+}
 
 func (s *ParticipantService) RemoveFromConference(id int64) error {
 	return s.repo.RemoveFromConference(id)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"sync"
 	"time"
 
@@ -56,6 +57,7 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, joinUrl string) *webrtc.TrackLo
 	r.rooms[joinUrl].trackLocals[t.ID()] = trackLocal
 	return trackLocal
 }
+
 func (r *Router) dispatchKeyFrame(joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer r.rooms[joinUrl].listLock.Unlock()
@@ -169,12 +171,7 @@ func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
 	if joinUrl == "error" {
 		return
 	}
-	if _, ok := r.clients[joinUrl]; !ok {
-		r.clients[joinUrl] = &ChatRoom{
-			listlock: sync.RWMutex{},
-			conn:     make(map[*websocket.Conn]*threadSafeWriter),
-		}
-	}
+
 	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}}
 	defer c.Close()
 	message := &websocketChatMessage{}
@@ -266,13 +263,21 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	if joinUrl == "error" {
 		return
 	}
+	userID := ws.Query("user_id", "error")
+	if userID == "error" {
+		return
+	}
+	user_id, err := strconv.Atoi(userID)
+	if err != nil {
+		return
+	}
 	if _, ok := r.rooms[joinUrl]; !ok {
 		r.rooms[joinUrl] = &Room{
 			trackLocals:     make(map[string]*webrtc.TrackLocalStaticRTP),
 			peerConnections: make([]peerConnectionState, 0),
 		}
 	}
-	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}}
+	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}, UserID: int64(user_id)}
 	defer c.Close()
 	peerConnection, err := r.createPeerConnection()
 	if err != nil {
@@ -370,6 +375,16 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 		}
 
 		switch message.Event {
+		case "join":
+			var joinMessage struct {
+				UserID int64 `json:"user_id"`
+			}
+			if err := json.Unmarshal([]byte(message.Data), &joinMessage); err != nil {
+				log.Errorf("Failed to unmarshal join message: %v", err)
+				return
+			}
+			c.UserID = joinMessage.UserID
+
 		case "candidate":
 			candidate := webrtc.ICECandidateInit{}
 			if err := json.Unmarshal([]byte(message.Data), &candidate); err != nil {
@@ -412,5 +427,45 @@ func (r *Router) cleanupRooms() {
 			room.listLock.Unlock()
 		}
 		r.roomslock.Unlock()
+	}
+}
+
+func (r *Router) closeExistingConnections(userID int64) {
+	r.roomslock.Lock()
+	defer r.roomslock.Unlock()
+
+	for _, room := range r.rooms {
+		room.listLock.Lock()
+		defer room.listLock.Unlock()
+
+		for i := 0; i < len(room.peerConnections); i++ {
+			if room.peerConnections[i].websocket.UserID == userID {
+				if err := room.peerConnections[i].peerConnection.Close(); err != nil {
+					log.Errorf("Failed to close peer connection: %v", err)
+				}
+				if err := room.peerConnections[i].websocket.Close(); err != nil {
+					log.Errorf("Failed to close websocket: %v", err)
+				}
+
+				room.peerConnections = append(room.peerConnections[:i], room.peerConnections[i+1:]...)
+				i--
+			}
+		}
+	}
+
+	r.clientlock.Lock()
+	defer r.clientlock.Unlock()
+
+	for _, chatRoom := range r.clients {
+		chatRoom.listlock.Lock()
+		for conn, writer := range chatRoom.conn {
+			if writer.UserID == userID {
+				if err := conn.Close(); err != nil {
+					log.Errorf("Failed to close chat connection: %v", err)
+				}
+				delete(chatRoom.conn, conn)
+			}
+		}
+		chatRoom.listlock.Unlock()
 	}
 }

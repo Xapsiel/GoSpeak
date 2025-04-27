@@ -19,21 +19,29 @@ func NewParticipantRepository(db *sqlx.DB) *ParticipantRepository {
 	}
 }
 
-//	func (r *ParticipantRepository) IsUserAdded(u int64, conf string) error {
-//		query := `
-//				SELECT * FROM participants
-//				WHERE user_id=$1 AND conference_id=$2
-//				`
-//		row := r.db.QueryRow(query, u, conf)
-//		var i interface{}
-//		if err := row.Scan(&i); err != nil {
-//			if err == sql.ErrNoRows {
-//				return nil
-//			}
-//			return err
-//		}
-//		return UserInAnotherErr
-//	}
+func (r *ParticipantRepository) IsUserInConf(u int64) ([]string, error) {
+	query := `
+				SELECT c.conference_id FROM participants
+				LEFT JOIN conferences as c
+				         ON c.conference_id=participants.conference_id
+				         WHERE user_id=$1
+				`
+	ids := make([]string, 0)
+	var id string
+	rows, err := r.db.Query(query, u)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&id)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
 func (r *ParticipantRepository) AddToConference(u int64, conf string) error {
 	query := `
 

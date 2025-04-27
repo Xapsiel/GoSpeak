@@ -1,6 +1,8 @@
 package http
 
 import (
+	"log/slog"
+
 	"GoSpeak/internal/model"
 
 	"github.com/gofiber/fiber/v2"
@@ -19,6 +21,9 @@ func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 
 	}
 	u := c.Locals("user_id").(int64)
+
+	r.closeExistingConnections(u)
+
 	err = r.service.Participant.AddToConference(u, conf.ConferenceID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Неверный формат данных")
@@ -52,4 +57,32 @@ func (r *Router) RenderConference(c *fiber.Ctx) error {
 	resp := ConferenceResponse{Page: r.NewPage()}
 	resp.Page.Title = "Видеоконференция"
 	return c.Render("conference", resp, "layouts/main")
+}
+
+func (r *Router) IsUserInConfMiddleware(c *fiber.Ctx) error {
+	u := c.Locals("user_id").(int64)
+	ids, err := r.service.IsUserInConf(u)
+	if err != nil {
+		return c.Next()
+	}
+	if len(ids) > 0 {
+		r.clientlock.Lock()
+		for _, id := range ids {
+			if _, ok := r.clients[id]; !ok {
+				continue
+			}
+			for c, v := range r.clients[id].conn {
+				if v.UserID == u {
+					err = c.Close()
+					if err != nil {
+						slog.Error(err.Error())
+
+					}
+					delete(r.clients[id].conn, c)
+				}
+			}
+		}
+		r.clientlock.Unlock()
+	}
+	return c.Next()
 }

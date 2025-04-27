@@ -35,7 +35,6 @@ body {
     padding: 0 1rem;
 }
 
-/* Анимации */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -52,7 +51,6 @@ body {
     100% { transform: scale(1); }
 }
 
-/* Кнопки */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -87,7 +85,6 @@ body {
     color: white;
 }
 
-/* Формы */
 .form-group {
     margin-bottom: 1.5rem;
 }
@@ -113,7 +110,6 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Карточки */
 .card {
     background: white;
     border-radius: 1rem;
@@ -127,7 +123,6 @@ body {
     box-shadow: var(--shadow-lg);
 }
 
-/* Утилиты */
 .text-center { text-align: center; }
 .mt-1 { margin-top: 0.5rem; }
 .mt-2 { margin-top: 1rem; }
@@ -138,7 +133,6 @@ body {
 .mb-3 { margin-bottom: 1.5rem; }
 .mb-4 { margin-bottom: 2rem; }
 
-/* Адаптивность */
 @media (max-width: 1200px) {
     .container {
         max-width: 960px;
@@ -197,7 +191,6 @@ body {
     }
 }
 
-/* Утилиты для адаптивности */
 @media (max-width: 768px) {
     .hide-mobile {
         display: none !important;

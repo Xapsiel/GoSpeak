@@ -36,6 +36,7 @@ type Participant interface {
 	AddToConference(u int64, conf string) error
 	RemoveFromConference(id int64) error
 	GetParticipantsByConferenceID(id string) ([]int64, error)
+	IsUserInConf(u int64) ([]string, error)
 }
 
 type Message interface {
