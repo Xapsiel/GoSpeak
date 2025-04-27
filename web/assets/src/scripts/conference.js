@@ -2,6 +2,7 @@ import axios from 'https://cdn.jsdelivr.net/npm/axios/dist/esm/axios.min.js';
 
 
 const state = {
+
     peerConnection : null,
     localStream: null,
     localStreamEl : null,
@@ -65,6 +66,7 @@ async function initLocalStream(){
 function createCard(video){
     let card = document.createElement('div');
     card.className="card shadow-sm";
+    card.style.padding='0px'
     card.addEventListener('click', () => {
         card.classList.toggle('expanded');
     });
@@ -280,6 +282,7 @@ const conference = {
     creator_id: 0,
     join_url: "",
     participants: new Map(),
+    conference_description:"",
 };
 
 
@@ -300,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     conference.id = response.data.conference_id;
                     conference.creater_id = response.data.creater_id;
                     conference.join_url = response.data.join_url;
+                    conference.conference_description = response.data.conference_description;
                     initConference();
                 }
             }).catch(error => {
@@ -433,7 +437,7 @@ function endCall() {
 
 async function initConference() {
 
-
+    document.getElementById("conference-description").textContent=conference.conference_description;
     setupWebSocket();
 
 }

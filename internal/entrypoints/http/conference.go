@@ -10,19 +10,20 @@ import (
 
 type ConferenceResponse struct {
 	*Page
+	Description string
 }
 
 func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 
-	join_url := c.Query("join_url")
-	conf, err := r.service.Conference.GetConference(join_url)
+	joinUrl := c.Query("join_url")
+	conf, err := r.service.Conference.GetConference(joinUrl)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Неверный формат данных")
 
 	}
 	u := c.Locals("user_id").(int64)
 
-	r.closeExistingConnections(u)
+	//r.closeExistingConnections(u)
 
 	err = r.service.Participant.AddToConference(u, conf.ConferenceID)
 	if err != nil {
@@ -30,9 +31,10 @@ func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"conference_id": conf.ConferenceID,
-		"creater_id":    conf.CreatorID,
-		"join_url":      join_url,
+		"conference_id":          conf.ConferenceID,
+		"conference_description": conf.Description,
+		"creater_id":             conf.CreatorID,
+		"join_url":               joinUrl,
 	})
 
 }

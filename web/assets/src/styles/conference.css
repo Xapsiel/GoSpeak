@@ -273,6 +273,16 @@
     transition: transform 0.2s ease;
     position: relative;
 }
+#conference-description {
+    background-color: rgba(102, 126, 234, 0.1);
+    border-left: 4px solid var(--primary-color);
+    padding: 1rem;
+    border-radius: 0 0.5rem 0.5rem 0;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    margin: 1rem 0 2rem;
+    line-height: 1.6;
+}
 .remoteVideo:hover{
     transform: translateY(-2px);
 }
