@@ -4,6 +4,7 @@ import axios from 'https://cdn.jsdelivr.net/npm/axios/dist/esm/axios.min.js';
 const state = {
     peerConnection : null,
     localStream: null,
+    localStreamEl : null,
     remoteStreams: new Map(),
     streamWS: null,
     chatWS: null,
@@ -22,35 +23,65 @@ const configuration = {
 };
 
 async function initLocalStream(){
-    try{
-        state.localStream= await navigator.mediaDevices.getUserMedia({
-            video:true,
-            audio:true
+    try {
+        state.localStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
         });
-    }catch (error){
+        if (state.localStreamEl!=null){
+            state.localStreamEl.srcObject=state.localStream;
+        }else{
+            state.localStreamEl = document.createElement("video");
+            state.localStreamEl.srcObject = state.localStream;
+            state.localStreamEl.autoplay = true;
+            state.localStreamEl.muted    = true;
+            state.localStreamEl.playsInline = true;
+            let card = createCard(state.localStreamEl)
+            document.getElementById("remoteVideos").appendChild(card);
+        }
+
+        await state.localStreamEl.play();
+    } catch (error) {
         console.error("Error accessing media devices:", error);
     }
 }
-
+function createCard(video){
+    let card = document.createElement('div');
+    card.className="col-12 col-md-6 col-lg-4 col-xl-3";
+    let card2 =document.createElement('div')
+    card2.className='card h-100 shadow-sm';
+    let card_video_container = document.createElement('div');
+    card_video_container.className='card-video-container ratio ratio-16x9';
+    video.className='w-100 h-100'
+    card_video_container.appendChild(video);
+    card2.appendChild(card_video_container);
+    card.appendChild(card2);
+    return card
+}
 function createPeerConnection(){
 
     state.peerConnection = new RTCPeerConnection(configuration);
 
     state.peerConnection.ontrack = function (event){
-
+        if (event.streams[0].id === state.localStream.id){
+            return;
+        }
         let el = document.createElement(event.track.kind);
         el.srcObject = event.streams[0];
         el.autoplay =true;
         el.controls=false;
-        el.className="remoteVideo";
-        document.getElementById("remoteVideos").appendChild(el);
+        let card = createCard(el)
+        if (event.track.kind === 'audio'){
+            return
+        }
+        document.getElementById("remoteVideos").appendChild(card);
         event.track.onmute = function (event){}
         event.track.onunmute = function (event){
             el.play();
         }
         event.streams[0].onremovetrack = ({track})=>{
-            if (el.parentNode){
-                el.parentNode.removeChild(el);
+            if (card.parentNode){
+                card.parentNode.removeChild(card);
             }
         }
     }
@@ -119,13 +150,6 @@ function sendMessage() {
         from: auth.user.user_id,
         data: input.value,
     };
-
-    const chatMessages = document.getElementById("chatMessages");
-    const message = document.createElement("div");
-    message.classList.add("chat-message");
-    message.textContent = `${auth.user.user_id}: ${input.value}`;
-    chatMessages.appendChild(message);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
 
     state.chatWS.send(JSON.stringify(messageData));
     input.value = "";
@@ -218,69 +242,69 @@ const conference = {
     participants: new Map(),
 };
 
-class RemoteVideoManager {
-    constructor() {
-        this.videoGrid = document.querySelector('.video-grid');
-        this.currentMode = 'grid';
-        this.setupModeToggle();
-    }
-
-    setupModeToggle() {
-        const toggleBtn = document.createElement('button');
-        toggleBtn.className = 'btn btn-icon';
-        toggleBtn.innerHTML = '<i class="fas fa-th-large"></i>';
-        toggleBtn.title = 'Переключить режим отображения';
-        toggleBtn.onclick = () => this.toggleDisplayMode();
-        
-        document.querySelector('.conference-controls').appendChild(toggleBtn);
-    }
-
-    toggleDisplayMode() {
-        this.currentMode = this.currentMode === 'grid' ? 'focus' : 'grid';
-        this.videoGrid.classList.toggle('focus-mode');
-        this.videoGrid.classList.toggle('grid-mode');
-        
-        if (this.currentMode === 'grid') {
-            const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
-            if (activeVideo) {
-                activeVideo.classList.remove('active');
-            }
-        }
-    }
-
-    createRemoteVideoContainer(peerId, userName) {
-        const container = document.createElement('div');
-        container.className = 'remote-video-container';
-        container.dataset.peerId = peerId;
-        
-        const video = document.createElement('video');
-        video.autoplay = true;
-        video.playsInline = true;
-        
-        const nameLabel = document.createElement('div');
-        nameLabel.className = 'user-name';
-        nameLabel.textContent = userName;
-        
-        container.appendChild(video);
-        container.appendChild(nameLabel);
-        
-        container.onclick = () => {
-            if (this.currentMode === 'focus') {
-                const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
-                if (activeVideo) {
-                    activeVideo.classList.remove('active');
-                }
-                container.classList.add('active');
-            }
-        };
-        
-        this.videoGrid.appendChild(container);
-        return container;
-    }
-}
+// class RemoteVideoManager {
+//     constructor() {
+//         this.videoGrid = document.querySelector('.video-grid');
+//         this.currentMode = 'grid';
+//         this.setupModeToggle();
+//     }
+//
+//     setupModeToggle() {
+//         const toggleBtn = document.createElement('button');
+//         toggleBtn.className = 'btn btn-icon';
+//         toggleBtn.innerHTML = '<i class="fas fa-th-large"></i>';
+//         toggleBtn.title = 'Переключить режим отображения';
+//         toggleBtn.onclick = () => this.toggleDisplayMode();
+//
+//         document.querySelector('.conference-controls').appendChild(toggleBtn);
+//     }
+//
+//     toggleDisplayMode() {
+//         this.currentMode = this.currentMode === 'grid' ? 'focus' : 'grid';
+//         this.videoGrid.classList.toggle('focus-mode');
+//         this.videoGrid.classList.toggle('grid-mode');
+//
+//         if (this.currentMode === 'grid') {
+//             const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
+//             if (activeVideo) {
+//                 activeVideo.classList.remove('active');
+//             }
+//         }
+//     }
+//
+//     createRemoteVideoContainer(peerId, userName) {
+//         const container = document.createElement('div');
+//         container.className = 'remote-video-container';
+//         container.dataset.peerId = peerId;
+//
+//         const video = document.createElement('video');
+//         video.autoplay = true;
+//         video.playsInline = true;
+//
+//         const nameLabel = document.createElement('div');
+//         nameLabel.className = 'user-name';
+//         nameLabel.textContent = userName;
+//
+//         container.appendChild(video);
+//         container.appendChild(nameLabel);
+//
+//         container.onclick = () => {
+//             if (this.currentMode === 'focus') {
+//                 const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
+//                 if (activeVideo) {
+//                     activeVideo.classList.remove('active');
+//                 }
+//                 container.classList.add('active');
+//             }
+//         };
+//
+//         this.videoGrid.appendChild(container);
+//         return container;
+//     }
+// }
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.remoteVideoManager = new RemoteVideoManager();
+    // window.remoteVideoManager = new RemoteVideoManager();
 
     const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
@@ -323,6 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         newUrl.searchParams.set('join_url', response.data.join_url);
                         window.location.href = newUrl.toString();
                     } else {
+
+
                         console.error("Ошибка: join_url отсутствует в ответе сервера");
                     }
                 }).catch(error => {
@@ -352,7 +378,19 @@ function initializeUser() {
     return Promise.resolve();
 }
 document.getElementById("sendMessage").addEventListener("click", sendMessage);
+const toggleBtn = document.getElementById('toggleVideo');
+toggleBtn.onclick = ()=>{
+    const videoTrack = state.localStream.getVideoTracks()[0];
+    if (videoTrack.enabled){
+        videoTrack.enabled=false;
+        videoTrack.stop();
+        state.localStreamEl.srcObject = null;
+    }else{
+        initLocalStream();
+        setupStreamWebSocket()
+    }
 
+}
 async function initConference() {
 
 

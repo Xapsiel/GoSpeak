@@ -1,10 +1,13 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 )
+
+var UserInAnotherErr = errors.New("User in another conference")
 
 type ParticipantRepository struct {
 	db *sqlx.DB
@@ -16,6 +19,21 @@ func NewParticipantRepository(db *sqlx.DB) *ParticipantRepository {
 	}
 }
 
+//	func (r *ParticipantRepository) IsUserAdded(u int64, conf string) error {
+//		query := `
+//				SELECT * FROM participants
+//				WHERE user_id=$1 AND conference_id=$2
+//				`
+//		row := r.db.QueryRow(query, u, conf)
+//		var i interface{}
+//		if err := row.Scan(&i); err != nil {
+//			if err == sql.ErrNoRows {
+//				return nil
+//			}
+//			return err
+//		}
+//		return UserInAnotherErr
+//	}
 func (r *ParticipantRepository) AddToConference(u int64, conf string) error {
 	query := `
 
@@ -28,7 +46,6 @@ func (r *ParticipantRepository) AddToConference(u int64, conf string) error {
 		DO UPDATE
 		    SET role = EXCLUDED.role, joined_at = EXCLUDED.joined_at, 
 		        conference_id = EXCLUDED.conference_id, user_id = EXCLUDED.user_id;
-	
 			`
 	role := "participant"
 	_, err := r.db.Exec(query, conf, u, role, time.Now())

@@ -164,7 +164,6 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 		log.Errorf("Failed to send offer: %v", err)
 	}
 }
-
 func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
 	joinUrl := ws.Query("join_url", "error")
 	if joinUrl == "error" {
@@ -203,9 +202,9 @@ func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
 				}
 			}
 			c.UserID = message.From
+
 			r.clients[message.ConferenceID].conn[ws] = c
 			r.clientlock.Unlock()
-			err = r.service.AddToConference(message.From, message.ConferenceID)
 			if err != nil {
 				slog.Error(err.Error())
 			}
@@ -220,11 +219,9 @@ func (r *Router) WebSocketChatHandler(ws *websocket.Conn) {
 				slog.Error(err.Error())
 			}
 			for _, el := range r.clients[message.ConferenceID].conn {
-				if el.UserID != message.From {
-					err = el.Conn.WriteMessage(websocket.TextMessage, raw)
-					if err != nil {
-						slog.Error(err.Error())
-					}
+				err = el.Conn.WriteMessage(websocket.TextMessage, raw)
+				if err != nil {
+					slog.Error(err.Error())
 				}
 			}
 
@@ -367,8 +364,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 			return
 		}
 
-		log.Infof("Got message: %s", raw)
-
 		if err := json.Unmarshal(raw, &message); err != nil {
 			log.Errorf("Failed to unmarshal json to message: %v", err)
 			return
@@ -382,8 +377,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 				return
 			}
 
-			log.Infof("Got candidate: %v", candidate)
-
 			if err := peerConnection.AddICECandidate(candidate); err != nil {
 				log.Errorf("Failed to add ICE candidate: %v", err)
 				return
@@ -394,8 +387,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 				log.Errorf("Failed to unmarshal json to answer: %v", err)
 				return
 			}
-
-			log.Infof("Got answer: %v", answer)
 
 			if err := peerConnection.SetRemoteDescription(answer); err != nil {
 				log.Errorf("Failed to set remote description: %v", err)
@@ -413,10 +404,12 @@ func (r *Router) cleanupRooms() {
 		time.Sleep(5 * time.Minute)
 		r.roomslock.Lock()
 		for url, room := range r.rooms {
+			room.listLock.Lock()
 			if len(room.peerConnections) == 0 && len(room.trackLocals) == 0 {
 				delete(r.rooms, url)
 				log.Infof("Cleaned up unused room: %s", url)
 			}
+			room.listLock.Unlock()
 		}
 		r.roomslock.Unlock()
 	}
