@@ -2,6 +2,7 @@ import axios from 'https://cdn.jsdelivr.net/npm/axios/dist/esm/axios.min.js';
 
 
 const state = {
+    role :"viewer",
     peerConnection : null,
     localStream: null,
     localStreamEl : null,
@@ -22,6 +23,16 @@ const configuration = {
     ]
 };
 
+// Управление камерой и микрофоном
+const toggleVideo = document.getElementById('toggleVideo');
+const toggleAudio = document.getElementById('toggleAudio');
+const endCallButton = document.getElementById('endCallButton');
+
+// Состояние камеры и микрофона
+let isVideoEnabled = true;
+let isAudioEnabled = true;
+
+// Инициализация локального потока
 async function initLocalStream(){
     try {
         state.localStream = await navigator.mediaDevices.getUserMedia({
@@ -41,21 +52,38 @@ async function initLocalStream(){
         }
 
         await state.localStreamEl.play();
+
+        // Добавляем треки в peer connection
+        if (state.peerConnection) {
+            state.localStream.getTracks().forEach(track => {
+                state.peerConnection.addTrack(track, state.localStream);
+            });
+        }
+        
+        return true;
     } catch (error) {
         console.error("Error accessing media devices:", error);
+        return false;
     }
 }
+
 function createCard(video){
     let card = document.createElement('div');
-    card.className="col-12 col-md-6 col-lg-4 col-xl-3";
-    let card2 =document.createElement('div')
-    card2.className='card h-100 shadow-sm';
+    card.className="card shadow-sm";
+    card.addEventListener('click', () => {
+        card.classList.toggle('expanded');
+    });
+    card.style.minWidth = '240px';
+    // let card2 =document.createElement('div')
+    // card2.className='card h-100 shadow-sm';
+    // card2.style.padding='0px'
     let card_video_container = document.createElement('div');
-    card_video_container.className='card-video-container ratio ratio-16x9';
-    video.className='w-100 h-100'
+    card_video_container.className='card-video-container';
+    card_video_container.style.padding = '0px';
+    video.className='w-100 h-100 object-fit-cover'
+
     card_video_container.appendChild(video);
-    card2.appendChild(card_video_container);
-    card.appendChild(card2);
+    card.appendChild(card_video_container);
     return card
 }
 function createPeerConnection(){
@@ -85,7 +113,10 @@ function createPeerConnection(){
             }
         }
     }
-    state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track,state.localStream))
+    if (state.localStream && state.role==="streamer"){
+        state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track,state.localStream))
+
+    }
     state.peerConnection.onicecandidate = e =>{
         if (!e.candidate){
             return;
@@ -94,13 +125,16 @@ function createPeerConnection(){
     }
 }
 async function setupStreamWebSocket(joinUrl){
-    await initLocalStream();
-    if (state.localStream){
-        await createPeerConnection();
-    }else{
-        return
+    if (role ==="streamer"){
+        await initLocalStream();
+        if (state.localStream){
+            await createPeerConnection();
+        }else{
+            return
+        }
     }
-    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}`);
+
+    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}&role=${state.role}`);
     state.streamWS.onclose  = function(event){
         window.alert("websocket has closed");
     }
@@ -114,13 +148,17 @@ async function setupStreamWebSocket(joinUrl){
         }
         switch (msg.event){
             case "answer":
-                let answer = JSON.parse(msg.data);
-                if (!answer){
-                    return console.log("failed to parse answer");
+                if (state.role === 'streamer') {
+                    let answer = JSON.parse(msg.data);
+                    if (!answer){
+                        return console.log("failed to parse answer");
+                    }
+                    state.peerConnection.setRemoteDescription(answer);
                 }
-                state.peerConnection.setRemoteDescription(answer)
-                return
+                break;
+
             case "offer":
+
                 let offer =JSON.parse(msg.data);
                 if (!offer){
                     return console.log("failed to parse offer");
@@ -242,73 +280,18 @@ const conference = {
     participants: new Map(),
 };
 
-// class RemoteVideoManager {
-//     constructor() {
-//         this.videoGrid = document.querySelector('.video-grid');
-//         this.currentMode = 'grid';
-//         this.setupModeToggle();
-//     }
-//
-//     setupModeToggle() {
-//         const toggleBtn = document.createElement('button');
-//         toggleBtn.className = 'btn btn-icon';
-//         toggleBtn.innerHTML = '<i class="fas fa-th-large"></i>';
-//         toggleBtn.title = 'Переключить режим отображения';
-//         toggleBtn.onclick = () => this.toggleDisplayMode();
-//
-//         document.querySelector('.conference-controls').appendChild(toggleBtn);
-//     }
-//
-//     toggleDisplayMode() {
-//         this.currentMode = this.currentMode === 'grid' ? 'focus' : 'grid';
-//         this.videoGrid.classList.toggle('focus-mode');
-//         this.videoGrid.classList.toggle('grid-mode');
-//
-//         if (this.currentMode === 'grid') {
-//             const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
-//             if (activeVideo) {
-//                 activeVideo.classList.remove('active');
-//             }
-//         }
-//     }
-//
-//     createRemoteVideoContainer(peerId, userName) {
-//         const container = document.createElement('div');
-//         container.className = 'remote-video-container';
-//         container.dataset.peerId = peerId;
-//
-//         const video = document.createElement('video');
-//         video.autoplay = true;
-//         video.playsInline = true;
-//
-//         const nameLabel = document.createElement('div');
-//         nameLabel.className = 'user-name';
-//         nameLabel.textContent = userName;
-//
-//         container.appendChild(video);
-//         container.appendChild(nameLabel);
-//
-//         container.onclick = () => {
-//             if (this.currentMode === 'focus') {
-//                 const activeVideo = this.videoGrid.querySelector('.remote-video-container.active');
-//                 if (activeVideo) {
-//                     activeVideo.classList.remove('active');
-//                 }
-//                 container.classList.add('active');
-//             }
-//         };
-//
-//         this.videoGrid.appendChild(container);
-//         return container;
-//     }
-// }
 
 document.addEventListener('DOMContentLoaded', () => {
     // window.remoteVideoManager = new RemoteVideoManager();
 
     const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
-
+    const role = urlParams.get("role");
+    if (role === "streamer"){
+        state.role=role;
+    }else{
+        state.role = "viewer";
+    }
     const createSection = document.getElementById("createConference");
     const conferenceSection = document.getElementById("conferenceSection");
 
@@ -357,6 +340,18 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    if (toggleVideo) {
+        toggleVideo.addEventListener('click', toggleVideoStream);
+    }
+    
+    if (toggleAudio) {
+        toggleAudio.addEventListener('click', toggleAudioStream);
+    }
+    
+    if (endCallButton) {
+        endCallButton.addEventListener('click', endCall);
+    }
 });
 
 function getUser() {
@@ -378,19 +373,70 @@ function initializeUser() {
     return Promise.resolve();
 }
 document.getElementById("sendMessage").addEventListener("click", sendMessage);
-const toggleBtn = document.getElementById('toggleVideo');
-toggleBtn.onclick = ()=>{
-    const videoTrack = state.localStream.getVideoTracks()[0];
-    if (videoTrack.enabled){
-        videoTrack.enabled=false;
-        videoTrack.stop();
-        state.localStreamEl.srcObject = null;
-    }else{
-        initLocalStream();
-        setupStreamWebSocket()
+
+function toggleVideoStream() {
+    if (!state.localStream) return;
+
+    const videoTracks = state.localStream.getVideoTracks();
+    if (videoTracks.length > 0) {
+        isVideoEnabled = !isVideoEnabled;
+        videoTracks.forEach(track => {
+            track.enabled = isVideoEnabled;
+        });
+
+        const icon = toggleVideo.querySelector('.control-icon');
+        if (icon) {
+            icon.innerHTML = isVideoEnabled
+                ? '<path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>'
+                : '<path d="M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 20 21 18.73 3.27 2z"/>';
+        }
+
+        toggleVideo.classList.toggle('active', isVideoEnabled);
+    }
+}
+
+function toggleAudioStream() {
+    if (!state.localStream) return;
+
+    const audioTracks = state.localStream.getAudioTracks();
+    if (audioTracks.length > 0) {
+        isAudioEnabled = !isAudioEnabled;
+        audioTracks.forEach(track => {
+            track.enabled = isAudioEnabled;
+        });
+
+        const icon = toggleAudio.querySelector('.control-icon');
+        if (icon) {
+            icon.innerHTML = isAudioEnabled
+                ? '<path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>'
+                : '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        }
+
+        // Обновляем стиль кнопки
+        toggleAudio.classList.toggle('active', isAudioEnabled);
+    }
+}
+
+function endCall() {
+    if (state.localStream) {
+        state.localStream.getTracks().forEach(track => track.stop());
     }
 
+    if (state.peerConnection) {
+        state.peerConnection.close();
+    }
+
+    if (state.streamWS) {
+        state.streamWS.close();
+    }
+
+    if (state.chatWS) {
+        state.chatWS.close();
+    }
+
+    window.location.href = '/';
 }
+
 async function initConference() {
 
 

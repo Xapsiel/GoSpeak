@@ -2,6 +2,8 @@ import axios from 'https://cdn.jsdelivr.net/npm/axios/dist/esm/axios.min.js';
 
 
 const state = {
+    sendVideo: true,
+    sendAudio: true,
     peerConnection : null,
     localStream: null,
     remoteStreams: new Map(),
@@ -62,11 +64,28 @@ function createPeerConnection(){
         document.getElementById(`remote-${userId}`).srcObject=stream;
 
     }
+    const videoTrack =state.localStream.getVideoTracks()[0];
+    const audioTrack = state.localStream.getAudioTracks()[0];
+    const vTransceiver = pc.addTransceiver('video',{
+        direction: state.sendVideo?'sendrecv':'recvonly'
+    })
+    if (state.sendVideo) vTransceiver.sender.replaceTrack(videoTrack);
+    const aTransceiver = pc.addTransceiver("audio", {
+        direction: state.sendAudio ? "sendrecv" : "recvonly"
+    });
+    if (state.sendAudio) aTransceiver.sender.replaceTrack(audioTrack);
+
     state.localStream.getTracks().forEach(track=>{
         pc.addTrack(track, state.localStream);
     })
     return pc;
 }
+async function renegotiate(){
+    const offer = await state.peerConnection.createOffer();
+    await state.peerConnection.setLocalDescription(offer);
+    sendWSMessage({ type: "offer", offer });
+}
+
 function  setupWebSocket(){
     state.ws = new WebSocket(`ws://${domain}/ws`);
     state.ws.onopen = ()=>{
