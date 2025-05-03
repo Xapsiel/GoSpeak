@@ -51,6 +51,7 @@ func (r *Router) RenderSignIn(c *fiber.Ctx) error {
 	resp.Page.Title = "Авторизация"
 	return c.Render("sign-in", resp, "layouts/main")
 }
+
 func (r *Router) JWTMiddleware(c *fiber.Ctx) error {
 	tokenStr := c.Get("Authorization")
 	if len(tokenStr) > 7 {
@@ -69,4 +70,11 @@ func (r *Router) JWTMiddleware(c *fiber.Ctx) error {
 	}
 	c.Locals("user_id", u)
 	return c.Next()
+}
+
+func (r *Router) LogoutHandler(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Успешный выход из системы",
+	})
 }

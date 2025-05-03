@@ -61,12 +61,12 @@ async function isAuthenticated() {
     }
 }
 
-function logout() {
-    window.localStorage.removeItem("jwtToken");
-    window.localStorage.removeItem("user");
+export function logout() {
     auth.token = null;
     auth.user = null;
-    window.location.href = "/sign-in";
+    window.localStorage.removeItem("jwtToken");
+    window.localStorage.removeItem("user");
+    window.location.href = "/";
 }
 
 if (elements.signInBtn) {
@@ -121,4 +121,16 @@ export async function initializeApp(){
 
 document.addEventListener("DOMContentLoaded", () => {
     initializeApp();
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", async (event) => {
+            event.preventDefault();
+            try {
+                await axiosInstance.post("/auth/logout");
+                logout();
+            } catch (error) {
+                console.error("Ошибка при выходе:", error);
+            }
+        });
+    }
 });

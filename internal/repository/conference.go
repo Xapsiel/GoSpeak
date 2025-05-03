@@ -13,6 +13,18 @@ type ConferenceRepository struct {
 	db *sqlx.DB
 }
 
+func (r *ConferenceRepository) DeleteConference(url string) error {
+	query := `
+			DELETE  FROM conferences
+			WHERE join_url=$1;
+			`
+	_, err := r.db.Exec(query, url)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func NewConferenceRepository(db *sqlx.DB) *ConferenceRepository {
 	return &ConferenceRepository{db: db}
 

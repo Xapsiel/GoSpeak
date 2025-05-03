@@ -26,7 +26,7 @@ const configuration = {
 const toggleVideo = document.getElementById('toggleVideo');
 const toggleAudio = document.getElementById('toggleAudio');
 const endCallButton = document.getElementById('endCallButton');
-
+const copyButton = document.getElementById("CopyButton");
 let isVideoEnabled = true;
 let isAudioEnabled = true;
 
@@ -41,24 +41,55 @@ async function initLocalStream(){
         }else{
             state.localStreamEl = document.createElement("video");
             state.localStreamEl.srcObject = state.localStream;
-            state.localStreamEl.autoplay = true;
-            state.localStreamEl.muted    = true;
+            state.localStreamEl.autoplay = false;
+            state.localStreamEl.muted = true;
             state.localStreamEl.playsInline = true;
             let card = createCard(state.localStreamEl)
             document.getElementById("remoteVideos").appendChild(card);
         }
 
-        await state.localStreamEl.play();
-
-        if (state.peerConnection) {
-            state.localStream.getTracks().forEach(track => {
-                state.peerConnection.addTrack(track, state.localStream);
-            });
-        }
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Начать конференцию';
+        startButton.className = 'start-conference-button';
+        startButton.onclick = async () => {
+            try {
+                await state.localStreamEl.play();
+                startButton.remove();
+                
+                if (state.peerConnection && state.localStream) {
+                    state.localStream.getTracks().forEach(track => {
+                        state.peerConnection.addTrack(track, state.localStream);
+                    });
+                }
+            } catch (err) {
+                console.error('Ошибка при воспроизведении:', err);
+            }
+        };
+        document.getElementById("remoteVideos").appendChild(startButton);
         
         return true;
     } catch (error) {
-        console.error("Error accessing media devices:", error);
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            console.log('Пользователь отказал в доступе к медиаустройствам. Режим просмотра.');
+            const placeholder = document.createElement('div');
+            placeholder.className = 'video-placeholder';
+            placeholder.innerHTML = `
+                <div class="placeholder-content">
+                    <svg class="placeholder-icon" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                    <span>Вы в режиме просмотра</span>
+                </div>
+            `;
+            let card = createCard(placeholder);
+            document.getElementById("remoteVideos").appendChild(card);
+            
+            if (toggleVideo) toggleVideo.disabled = true;
+            if (toggleAudio) toggleAudio.disabled = true;
+            
+            return false;
+        }
+        console.error('Ошибка при инициализации потока:', error);
         return false;
     }
 }
@@ -84,32 +115,57 @@ function createPeerConnection(){
 
     state.peerConnection = new RTCPeerConnection(configuration);
 
-    state.peerConnection.ontrack = function (event){
-        if (event.streams[0].id === state.localStream.id){
-            return;
+    state.peerConnection.ontrack = function (event) {
+        if (state.localStream) {
+            if (event.streams[0].id === state.localStream.id) {
+                return;
+            }
         }
+
         let el = document.createElement(event.track.kind);
         el.srcObject = event.streams[0];
-        el.autoplay =true;
-        el.controls=false;
-        let card = createCard(el)
+        el.autoplay = false;
+        el.controls = false;
+        el.playsInline = true;
+        
+        let card = createCard(el);
         if (event.track.kind === 'audio'){
-            return
+            return;
         }
+        
+        const startButton = document.createElement('button');
+        startButton.textContent = 'Включить видео';
+        startButton.className = 'start-conference-button';
+        startButton.onclick = async () => {
+            try {
+                el.play();
+                startButton.remove();
+            } catch (err) {
+                console.error('Ошибка при воспроизведении:', err);
+            }
+        };
+        card.appendChild(startButton);
+        
         document.getElementById("remoteVideos").appendChild(card);
+        
         event.track.onmute = function (event){}
         event.track.onunmute = function (event){
-            el.play();
+            el.play().catch(err => {
+                console.error('Ошибка при воспроизведении:', err);
+            });
         }
-        event.streams[0].onremovetrack = ({track})=>{
+        event.streams[0].onremovetrack = ({track}) => {
             if (card.parentNode){
                 card.parentNode.removeChild(card);
             }
         }
     }
+    
+    if (state.localStream){
         state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track,state.localStream))
-
-    state.peerConnection.onicecandidate = e =>{
+    }
+    
+    state.peerConnection.onicecandidate = e => {
         if (!e.candidate){
             return;
         }
@@ -117,19 +173,19 @@ function createPeerConnection(){
     }
 }
 async function setupStreamWebSocket(joinUrl){
+    try{
         await initLocalStream();
-        if (state.localStream){
-            await createPeerConnection();
-        }else{
-            return
-        }
+    }catch (error){
+        console.log(error)
+    }
+    await createPeerConnection();
 
     state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}&user_id=${auth.user.user_id}`);
     state.streamWS.onclose  = function(event){
-        window.location.href = '/';
+        // window.location.href = '/';
     }
     state.streamWS.onerror=function (event){
-        window.location.href = '/';
+        // window.location.href = '/';
     }
     state.streamWS.onopen = function() {
         state.streamWS.send(JSON.stringify({
@@ -138,6 +194,8 @@ async function setupStreamWebSocket(joinUrl){
                 user_id: auth.user.user_id
             })
         }));
+        
+        
     }
     state.streamWS.onmessage = function (event){
         let msg = JSON.parse(event.data);
@@ -146,25 +204,27 @@ async function setupStreamWebSocket(joinUrl){
         }
         switch (msg.event){
             case "answer":
-                    let answer = JSON.parse(msg.data);
-                    if (!answer){
-                        return console.log("failed to parse answer");
-                    }
-                    state.peerConnection.setRemoteDescription(answer);
+                let answer = JSON.parse(msg.data);
+                if (!answer){
+                    return console.log("failed to parse answer");
+                }
+                state.peerConnection.setRemoteDescription(answer);
                 break;
 
             case "offer":
-
-                let offer =JSON.parse(msg.data);
+                let offer = JSON.parse(msg.data);
                 if (!offer){
                     return console.log("failed to parse offer");
                 }
                 state.peerConnection.setRemoteDescription(offer);
-                state.peerConnection.createAnswer().then(answer=>{
+                state.peerConnection.createAnswer().then(answer => {
                     state.peerConnection.setLocalDescription(answer);
-                    state.streamWS.send(JSON.stringify({event: "answer", data: JSON.stringify(answer)}))
-                })
-                return
+                    state.streamWS.send(JSON.stringify({
+                        event: "answer",
+                        data: JSON.stringify(answer)
+                    }));
+                });
+                return;
             case "candidate":
                 let candidate = JSON.parse(msg.data);
                 if (!candidate){
@@ -202,7 +262,7 @@ async function setupChatWebSocket(joinUrl){
         sendChatWSMessage({event:"join", conference_id: conference.id, from: auth.user.user_id,})
     }
     state.chatWS.onclose  = function(event){
-        window.location.href = '/';
+        // window.location.href = '/';
 
     }
     state.chatWS.onerror = function(event){
@@ -281,14 +341,15 @@ const conference = {
     id: 0,
     creator_id: 0,
     join_url: "",
+    title: "",
     participants: new Map(),
-    conference_description:"",
+    description:"",
 };
 
+const urlParams = new URLSearchParams(window.location.search);
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    const urlParams = new URLSearchParams(window.location.search);
     const joinUrl = urlParams.get("join_url");
     const createSection = document.getElementById("createConference");
     const conferenceSection = document.getElementById("conferenceSection");
@@ -303,7 +364,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     conference.id = response.data.conference_id;
                     conference.creater_id = response.data.creater_id;
                     conference.join_url = response.data.join_url;
-                    conference.conference_description = response.data.conference_description;
+                    conference.description = response.data.description;
+                    conference.title = response.data.title
                     initConference();
                 }
             }).catch(error => {
@@ -351,8 +413,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (endCallButton) {
         endCallButton.addEventListener('click', endCall);
     }
+    if (copyButton){
+        copyButton.addEventListener("click", CopyToClipboard)
+    }
 });
-
+async function CopyToClipboard() {
+    try {
+        let text = ""
+        let join_url =urlParams.get("join_url")
+        if (join_url){
+            text += `Присоединяйтесь к видеоконференции: ${window.location.href}\n`
+        }
+        if (conference.title){
+            text += `Тема: ${conference.title}\n`;
+        }
+        await navigator.clipboard.writeText(text);
+    } catch (err) {
+    }
+}
 function getUser() {
     return axiosInstance.get("/user/", {
         headers: { "Authorization": `Bearer ${auth.token}` },
@@ -436,8 +514,16 @@ function endCall() {
 }
 
 async function initConference() {
-
-    document.getElementById("conference-description").textContent=conference.conference_description;
+    if (conference.description){
+        document.getElementById("conference-description").textContent=conference.description;
+    }else{
+        document.getElementById("conference-description").remove();
+    }
+    if (conference.title){
+        document.getElementById("conference-title" ).textContent=conference.title
+    }else{
+        document.getElementById("conference-title" ).remove();
+    }
     setupWebSocket();
 
 }

@@ -83,35 +83,31 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
 		r.rooms[joinUrl].listLock.Unlock()
-
 	}()
+
 	if r.rooms[joinUrl].pendingSignal {
 		return
 	}
 	r.rooms[joinUrl].pendingSignal = true
-	time.AfterFunc(500*time.Millisecond, func() {
-		defer func() {
-			r.rooms[joinUrl].pendingSignal = false
-		}()
-		var wg sync.WaitGroup
-		for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
-			if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-				r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
-				i--
-				continue
-			}
 
-			wg.Add(1)
-			go func(idx int) {
-				defer wg.Done()
-				r.signalPeer(joinUrl, idx)
-			}(i)
+	var wg sync.WaitGroup
+	for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
+		if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+			r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
+			i--
+			continue
 		}
-		time.AfterFunc(100*time.Millisecond, func() {
-			r.dispatchKeyFrame(joinUrl)
-		})
-		wg.Wait()
-	})
+
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			r.signalPeer(joinUrl, idx)
+		}(i)
+	}
+
+	wg.Wait()
+	r.rooms[joinUrl].pendingSignal = false
+	r.dispatchKeyFrame(joinUrl)
 }
 
 func (r *Router) signalPeer(joinUrl string, idx int) {
@@ -296,6 +292,7 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	r.rooms[joinUrl].listLock.Lock()
 	r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections, peerConnectionState{peerConnection: peerConnection, websocket: c})
 	r.rooms[joinUrl].listLock.Unlock()
+
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i == nil {
 			return
@@ -358,10 +355,11 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 			}
 		}
 	})
+	r.signalPeerConnections(joinUrl)
+
 	peerConnection.OnICEConnectionStateChange(func(is webrtc.ICEConnectionState) {
 		log.Infof("ICE connection state changed: %s", is)
 	})
-	r.signalPeerConnections(joinUrl)
 	message := &websocketStreamerMessage{}
 	for {
 		_, raw, err := c.ReadMessage()
@@ -422,6 +420,10 @@ func (r *Router) cleanupRooms() {
 			room.listLock.Lock()
 			if len(room.peerConnections) == 0 && len(room.trackLocals) == 0 {
 				delete(r.rooms, url)
+				err := r.service.Conference.DeleteConference(url)
+				if err != nil {
+					slog.Error("error when trying to delete room from db", err)
+				}
 				log.Infof("Cleaned up unused room: %s", url)
 			}
 			room.listLock.Unlock()

@@ -31,10 +31,11 @@ func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"conference_id":          conf.ConferenceID,
-		"conference_description": conf.Description,
-		"creater_id":             conf.CreatorID,
-		"join_url":               joinUrl,
+		"conference_id": conf.ConferenceID,
+		"description":   conf.Description,
+		"title":         conf.Title,
+		"creater_id":    conf.CreatorID,
+		"join_url":      joinUrl,
 	})
 
 }

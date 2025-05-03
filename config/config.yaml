@@ -1,6 +1,6 @@
 
 db:
-  host: localhost
+  host:  localhost
   user: postgres
   port: 5433
   password: postgres
@@ -9,5 +9,5 @@ db:
 
 host:
   port: 9000
-  domain: localhost:9000
+  domain:  localhost:9000
   name: GoSpeak

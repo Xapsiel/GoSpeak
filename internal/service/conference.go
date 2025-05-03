@@ -28,3 +28,6 @@ func (s *ConferenceService) CreateConference(c *model.Conference) (*model.Confer
 func (s *ConferenceService) GetConference(join_url string) (*model.Conference, error) {
 	return s.repo.GetConference(join_url)
 }
+func (s *ConferenceService) DeleteConference(joinUrl string) error {
+	return s.repo.DeleteConference(joinUrl)
+}

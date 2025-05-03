@@ -9,7 +9,15 @@
                 <span class="site-name">{{.Name}}</span>
             </a>
         </div>
-        <nav class="header-nav">
+        
+        <!-- Мобильная кнопка меню -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+            <svg class="menu-icon" viewBox="0 0 24 24">
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+            </svg>
+        </button>
+        
+        <nav class="header-nav" id="headerNav">
             <a href="http://{{.Domain}}/" class="nav-link">
                 <svg class="nav-icon" viewBox="0 0 24 24">
                     <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
@@ -22,7 +30,13 @@
                 </svg>
                 <span>Конференции</span>
             </a>
-            <a href="http://{{.Domain}}/sign-in" class="nav-link">
+            <a href="http://{{.Domain}}/" class="nav-link" id="logoutBtn">
+                <svg class="nav-icon" viewBox="0 0 24 24">
+                    <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+                </svg>
+                <span>Выход</span>
+            </a>
+            <a href="http://{{.Domain}}/sign-in" class="nav-link" id="loginBtn">
                 <svg class="nav-icon" viewBox="0 0 24 24">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
                 </svg>
@@ -126,6 +140,39 @@
     transform: scale(1.1);
 }
 
+/* Мобильная кнопка меню */
+.mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.3s ease;
+}
+
+.mobile-menu-toggle:hover {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.menu-icon {
+    width: 24px;
+    height: 24px;
+    fill: var(--text-color);
+}
+
+/* Адаптивность для планшетов */
+@media (max-width: 1024px) {
+    .header-container {
+        padding: 1rem 1.5rem;
+    }
+    
+    .header-nav {
+        gap: 1.5rem;
+    }
+}
+
+/* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
     .header-container {
         padding: 1rem;
@@ -134,23 +181,84 @@
     .site-name {
         font-size: 1.25rem;
     }
-
-    .header-nav {
-        gap: 1rem;
+    
+    .mobile-menu-toggle {
+        display: block;
     }
-
-    .nav-link span {
-        display: none;
+    
+    .header-nav {
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        background: rgba(255, 255, 255, 0.98);
+        flex-direction: column;
+        gap: 0;
+        padding: 1rem 0;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        transform: translateY(-100%);
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        z-index: 999;
+    }
+    
+    .header-nav.active {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
     }
 
     .nav-link {
-        padding: 0.5rem;
+        width: 100%;
+        padding: 1rem 2rem;
+        border-radius: 0;
+        justify-content: flex-start;
     }
-
+    
+    .nav-link:hover {
+        background: rgba(102, 126, 234, 0.1);
+        transform: none;
+    }
+    
     .nav-icon {
         width: 24px;
         height: 24px;
     }
 }
+
+/* Адаптивность для маленьких мобильных устройств */
+@media (max-width: 480px) {
+    .logo-icon {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .site-name {
+        font-size: 1.1rem;
+    }
+}
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+    const headerNav = document.getElementById('headerNav');
+    
+    if (mobileMenuToggle && headerNav) {
+        mobileMenuToggle.addEventListener('click', function() {
+            headerNav.classList.toggle('active');
+        });
+        
+        // Закрываем меню при клике вне его
+        document.addEventListener('click', function(event) {
+            const isClickInside = headerNav.contains(event.target) || mobileMenuToggle.contains(event.target);
+            
+            if (!isClickInside && headerNav.classList.contains('active')) {
+                headerNav.classList.remove('active');
+            }
+        });
+    }
+});
+</script>
 {{end}}

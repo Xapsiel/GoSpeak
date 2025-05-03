@@ -109,20 +109,17 @@ func (r *Router) Routes(app fiber.Router) {
 	conference := app.Group("/conference")
 	auth.Post("/sign-up", r.PostSignUpHandler)
 	auth.Post("/sign-in", r.PostSignInHandler)
+	auth.Post("/logout", r.LogoutHandler)
 	user.Get("/", r.GetUserHandler)
 	conference.Use(r.JWTMiddleware)
 	conference.Post("/create", r.CreateConferenceHandler)
 	conference.Get("/join", r.JoinConferenceHandler)
 
 	app.Get("/ws/stream", websocket.New(r.WebSocketStreamerHandler))
-	app.Get("/ws/chat", websocket.New(r.WebSocketChatHandler))
+	app.Get("/ws/chat", websocket.New(r.WebSocketChatHandler)).Use(r.JWTMiddleware)
 	go r.cleanupRooms()
 }
 
 func (r *Router) NewPage() *Page {
 	return &Page{Domain: r.cfg.Domain, Name: r.cfg.Name}
-}
-
-func (r *Router) HandleWebSocketConnection(conn *websocket.Conn) {
-
 }

@@ -47,7 +47,7 @@
     <section id="conferenceSection" class="conference d-none">
         <div class="conference-room">
             <div class="conference-header">
-                <h2>Видеоконференция</h2>
+                <h2 id="conference-title">Видеоконференция</h2>
                 <p id="conference-description"></p>
                 <div class="conference-controls">
                     <button class="control-button" id="toggleVideo" title="Включить/выключить видео">
@@ -61,9 +61,19 @@
                             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
                         </svg>
                     </button>
+                    <button class="control-button" id="toggleChat" title="Показать/скрыть чат">
+                        <svg class="control-icon" viewBox="0 0 24 24">
+                            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                        </svg>
+                    </button>
                     <button class="control-button danger" id="endCallButton" title="Завершить звонок">
                         <svg class="control-icon" viewBox="0 0 24 24">
                             <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+                        </svg>
+                    </button>
+                    <button class="control-button" id="CopyButton" title="Поделиться ссылкой">
+                        <svg class="control-icon" viewBox="0 0 24 24">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                         </svg>
                     </button>
                 </div>
@@ -72,22 +82,16 @@
             <div class="conference-content">
                 <div class="video-section">
                     <div class="video-grid grid-mode">
-
-                        <div id="remoteVideos"
-                             class="d-flex flex-wrap gap-3"
-                        >
-
-
+                        <div id="remoteVideos" class="d-flex flex-wrap gap-3">
                             <!-- Удаленные видео будут добавлены динамически -->
-
                         </div>
                     </div>
                 </div>
 
-                <div class="chat-section">
+                <div class="chat-section" id="chatSection">
                     <div class="chat-header">
                         <h3>Чат</h3>
-                        <button class="chat-toggle" title="Свернуть/развернуть чат">
+                        <button class="chat-toggle" id="chatToggle" title="Свернуть/развернуть чат">
                             <svg class="chat-icon" viewBox="0 0 24 24">
                                 <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
                             </svg>
@@ -113,3 +117,162 @@
         </div>
     </section>
 </main>
+
+<style>
+/* Адаптивные стили для конференции */
+@media (max-width: 1024px) {
+    .conference-content {
+        flex-direction: column;
+    }
+    
+    .video-section {
+        width: 100%;
+        height: 60vh;
+    }
+    
+    .chat-section {
+        width: 100%;
+        height: 40vh;
+    }
+}
+
+@media (max-width: 768px) {
+    .conference-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .conference-controls {
+        gap: 0.5rem;
+    }
+    
+    .control-button {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .video-section {
+        height: 50vh;
+    }
+    
+    .chat-section {
+        height: 50vh;
+    }
+    
+    .chat-section.collapsed {
+        height: 50px;
+    }
+}
+
+@media (max-width: 480px) {
+    .conference-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .conference-controls {
+        gap: 0.3rem;
+    }
+    
+    .control-button {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .control-icon {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .video-section {
+        height: 40vh;
+    }
+    
+    .chat-section {
+        height: 60vh;
+    }
+    
+    .chat-section.collapsed {
+        height: 40px;
+    }
+    
+    .chat-header h3 {
+        font-size: 1rem;
+    }
+    
+    .chat-input {
+        font-size: 0.9rem;
+    }
+}
+
+/* Стили для планшетов в портретной ориентации */
+@media (max-width: 768px) and (orientation: portrait) {
+    .conference-content {
+        flex-direction: column;
+    }
+    
+    .video-section {
+        height: 40vh;
+    }
+    
+    .chat-section {
+        height: 60vh;
+    }
+}
+
+/* Стили для планшетов в ландшафтной ориентации */
+@media (max-width: 1024px) and (orientation: landscape) {
+    .conference-content {
+        flex-direction: row;
+    }
+    
+    .video-section {
+        width: 70%;
+        height: 100%;
+    }
+    
+    .chat-section {
+        width: 30%;
+        height: 100%;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчик для кнопки переключения чата
+    const chatToggle = document.getElementById('chatToggle');
+    const chatSection = document.getElementById('chatSection');
+    
+    if (chatToggle && chatSection) {
+        chatToggle.addEventListener('click', function() {
+            chatSection.classList.toggle('collapsed');
+        });
+    }
+    
+    // Обработчик для кнопки переключения чата в панели управления
+    const toggleChatBtn = document.getElementById('toggleChat');
+    
+    if (toggleChatBtn && chatSection) {
+        toggleChatBtn.addEventListener('click', function() {
+            chatSection.classList.toggle('collapsed');
+        });
+    }
+    
+    // Адаптация для мобильных устройств
+    function adjustForMobile() {
+        const isMobile = window.innerWidth <= 768;
+        const chatSection = document.getElementById('chatSection');
+        
+        if (isMobile && chatSection) {
+            // На мобильных устройствах чат по умолчанию свернут
+            chatSection.classList.add('collapsed');
+        } else if (chatSection) {
+            // На десктопах чат по умолчанию развернут
+            chatSection.classList.remove('collapsed');
+        }
+    }
+    
+    // Вызываем функцию при загрузке и при изменении размера окна
+    adjustForMobile();
+    window.addEventListener('resize', adjustForMobile);
+});
+</script>

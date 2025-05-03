@@ -31,6 +31,7 @@ type User interface {
 type Conference interface {
 	CreateConference(c *model.Conference) error
 	GetConference(join_url string) (*model.Conference, error)
+	DeleteConference(url string) error
 }
 type Participant interface {
 	AddToConference(u int64, conf string) error

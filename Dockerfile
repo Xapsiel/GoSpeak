@@ -1,35 +1,38 @@
-# Используем официальный образ Go
-FROM golang:1.21-alpine AS builder
+FROM golang:1.20-alpine AS builder
 
-# Устанавливаем рабочую директорию
+RUN apk add --no-cache git
+
 WORKDIR /app
 
-# Копируем файлы проекта
-COPY . .
+COPY go.mod go.sum* ./
 
-# Скачиваем зависимости
 RUN go mod download
 
-# Собираем приложение
-RUN go build -o main ./cmd
+COPY . .
 
-# Используем минимальный образ для финального контейнера
-FROM alpine:latest
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gospeak ./cmd/main.go
 
-# Устанавливаем рабочую директорию
-WORKDIR /app
+FROM alpine:3.18
 
-# Копируем бинарный файл из builder
-COPY --from=builder /app/main .
+RUN apk --no-cache add ca-certificates tzdata
 
-# Копируем статические файлы (HTML, CSS, JS)
-COPY ./web/views ./web/views
+RUN adduser -D -g '' gospeak
 
-# Копируем сертификаты (если используются)
-COPY cert.pem key.pem ./
+WORKDIR /home/gospeak
 
-# Открываем порт 8080
+COPY --from=builder /app/gospeak .
+
+COPY --from=builder /app/web ./web
+COPY --from=builder /app/config ./config
+
+ENV PORT=8080
+ENV GIN_MODE=release
+
+RUN chown -R gospeak:gospeak /home/gospeak
+
+USER gospeak
+
 EXPOSE 8080
 
-# Команда для запуска приложения
-CMD ["./main"]
+# Запуск приложения
+CMD ["./gospeak"]

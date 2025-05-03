@@ -474,14 +474,14 @@
     max-width: 500px;
     border-radius: 12px;
     overflow: hidden;
-    transition: all 0.3s ease;
-    cursor: pointer;
+    /*transition: all 0.3s ease;*/
+    /*cursor: pointer;*/
 }
 
-.card.expanded {
-    transform: scale(1.3) translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
+/*.card.expanded {*/
+/*    transform: scale(1.3) translateY(-2px);*/
+/*    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);*/
+/*}*/
 
 #remoteVideos {
     display: grid;
@@ -523,4 +523,95 @@
 
 .card-video-container {
     animation: fadeIn 0.3s ease-out;
+}
+
+.start-conference-button {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin: 1rem auto;
+    display: block;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.start-conference-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.start-conference-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.video-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+}
+
+.placeholder-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: #ffffff;
+    text-align: center;
+    padding: 1rem;
+}
+
+.placeholder-icon {
+    width: 48px;
+    height: 48px;
+    fill: #667eea;
+    opacity: 0.7;
+}
+
+.placeholder-content span {
+    font-size: 1rem;
+    color: #a0aec0;
+}
+
+.control-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.card .start-conference-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.card .start-conference-button:hover {
+    background: rgba(102, 126, 234, 1);
+    transform: translate(-50%, -50%) scale(1.05);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+.card .start-conference-button:active {
+    transform: translate(-50%, -50%) scale(0.95);
 }
