@@ -135,7 +135,6 @@
 </main>
 
 <style>
-/* Адаптивные стили для конференции */
 @media (max-width: 1024px) {
     .conference-content {
         flex-direction: column;
@@ -148,7 +147,7 @@
     
     .chat-section {
         width: 100%;
-        height: 40vh;
+        height: 100%;
     }
 }
 
@@ -219,7 +218,6 @@
     }
 }
 
-/* Стили для планшетов в портретной ориентации */
 @media (max-width: 768px) and (orientation: portrait) {
     .conference-content {
         flex-direction: column;
@@ -234,7 +232,6 @@
     }
 }
 
-/* Стили для планшетов в ландшафтной ориентации */
 @media (max-width: 1024px) and (orientation: landscape) {
     .conference-content {
         flex-direction: row;
@@ -247,11 +244,10 @@
     
     .chat-section {
         width: 30%;
-        height: 100%;
+        height: inherit;
     }
 }
 
-/* Стили для чекбокса */
 .checkbox-label {
     display: flex;
     align-items: center;
