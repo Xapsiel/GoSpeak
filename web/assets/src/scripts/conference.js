@@ -10,7 +10,9 @@ const state = {
     streamWS: null,
     chatWS: null,
     conferenceId: null,
-    userId: null
+    userId: null,
+    isViewer: false,
+    joinUrl: ""
 }
 const configuration = {
     iceServers: [
@@ -65,6 +67,7 @@ async function initLocalStream(){
         return true;
     } catch (error) {
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            state.isViewer=true;
             console.log('Пользователь отказал в доступе к медиаустройствам. Режим просмотра.');
             const placeholder = document.createElement('div');
             placeholder.className = 'video-placeholder';
@@ -159,11 +162,12 @@ async function setupStreamWebSocket(joinUrl){
     try{
         await initLocalStream();
     }catch (error){
+        state.isViewer=true;
         console.log(error)
     }
     await createPeerConnection();
 
-    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}&user_id=${auth.user.user_id}`);
+    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}&user_id=${auth.user.user_id}&role=${state.isViewer ? "viewer" : "streamer"}`);
     state.streamWS.onclose  = function(event){
         // window.location.href = '/';
     }
@@ -177,8 +181,6 @@ async function setupStreamWebSocket(joinUrl){
                 user_id: auth.user.user_id
             })
         }));
-        
-        
     }
     state.streamWS.onmessage = function (event){
         let msg = JSON.parse(event.data);
@@ -186,6 +188,39 @@ async function setupStreamWebSocket(joinUrl){
             return console.log("failed to parse msg")
         }
         switch (msg.event){
+            case "error":
+                // Показываем сообщение об ошибке
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-warning';
+                errorDiv.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <svg class="me-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div>${msg.data}</div>
+                    </div>
+                `;
+                document.getElementById('conferenceSection').prepend(errorDiv);
+                
+                // Отключаем кнопки управления
+                if (toggleVideo) toggleVideo.disabled = true;
+                if (toggleAudio) toggleAudio.disabled = true;
+                if (endCallButton) endCallButton.disabled = true;
+                
+                // Показываем сообщение о том, что пользователь может присоединиться только для просмотра
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'alert alert-info mt-2';
+                infoDiv.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <svg class="me-2" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div>Вы можете присоединиться к конференции в режиме просмотра</div>
+                    </div>
+                `;
+                document.getElementById('conferenceSection').appendChild(infoDiv);
+                return;
+
             case "answer":
                 let answer = JSON.parse(msg.data);
                 if (!answer){
@@ -531,3 +566,61 @@ chatSection.addEventListener('mouseenter', () => {
 chatSection.addEventListener('mouseleave', () => {
     videoSection.classList.remove('chat-open');
 });
+
+// Функция подключения к конференции
+async function connectToConference() {
+    try {
+        // Проверяем наличие камеры и микрофона
+        const hasVideo = await checkMediaAccess('video');
+        const hasAudio = await checkMediaAccess('audio');
+
+        // Если нет ни камеры, ни микрофона, подключаемся в режиме просмотра
+        if (!hasVideo && !hasAudio) {
+            state.isViewer = true;
+            state.streamWS.send(JSON.stringify({
+                event: "join",
+                data: {
+                    joinUrl: state.joinUrl,
+                    isViewer: true
+                }
+            }));
+            return;
+        }
+
+        // Если есть камера или микрофон, запрашиваем разрешение
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: hasVideo,
+            audio: hasAudio
+        });
+
+        // Подключаемся к конференции
+        state.streamWS.send(JSON.stringify({
+            event: "join",
+            data: {
+                joinUrl: state.joinUrl,
+                isViewer: false
+            }
+        }));
+
+        // Сохраняем поток
+        state.localStream = stream;
+        
+        // Обновляем UI
+        updateMediaControls(hasVideo, hasAudio);
+        
+    } catch (error) {
+        console.error("Ошибка при подключении:", error);
+        showError("Не удалось подключиться к конференции");
+    }
+}
+
+// Функция проверки доступа к медиаустройствам
+async function checkMediaAccess(type) {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        return devices.some(device => device.kind === `${type}input`);
+    } catch (error) {
+        console.error(`Ошибка при проверке ${type}:`, error);
+        return false;
+    }
+}

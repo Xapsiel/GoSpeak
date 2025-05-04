@@ -52,6 +52,7 @@ type Room struct {
 	peerConnections  []peerConnectionState
 	trackLocals      map[string]*webrtc.TrackLocalStaticRTP
 	lastPLI          time.Time
+	activeCount      int
 }
 type ChatRoom struct {
 	listlock sync.RWMutex

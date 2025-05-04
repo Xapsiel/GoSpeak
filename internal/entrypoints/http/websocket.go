@@ -30,6 +30,64 @@ var rtpBufferPool = sync.Pool{
 	},
 }
 
+const MaxActiveParticipants = 3
+
+func (r *Router) canAddParticipant(joinUrl string) bool {
+	room, ok := r.rooms[joinUrl]
+	if !ok {
+		return true
+	}
+
+	room.listLock.RLock()
+	defer room.listLock.RUnlock()
+
+	activeParticipants := 0
+	for _, pc := range room.peerConnections {
+		hasActiveTracks := false
+		for _, sender := range pc.peerConnection.GetSenders() {
+			if sender.Track() != nil {
+				hasActiveTracks = true
+				break
+			}
+		}
+		if hasActiveTracks {
+			activeParticipants++
+		}
+	}
+
+	slog.Info(fmt.Sprintf("%d активных участников (с камерой/аудио)", activeParticipants))
+	return activeParticipants < MaxActiveParticipants
+}
+
+// Функция обновления счетчика активных участников
+func (r *Router) updateActiveCount(joinUrl string, increment bool) {
+	room, ok := r.rooms[joinUrl]
+	if !ok {
+		return
+	}
+
+	room.listLock.Lock()
+	defer room.listLock.Unlock()
+
+	// Пересчитываем количество активных участников
+	activeParticipants := 0
+	for _, pc := range room.peerConnections {
+		hasActiveTracks := false
+		for _, sender := range pc.peerConnection.GetSenders() {
+			if sender.Track() != nil {
+				hasActiveTracks = true
+				break
+			}
+		}
+		if hasActiveTracks {
+			activeParticipants++
+		}
+	}
+
+	room.activeCount = activeParticipants
+	slog.Info(fmt.Sprintf("Обновлено количество активных участников: %d", activeParticipants))
+}
+
 func (r *Router) removeTrack(t *webrtc.TrackLocalStaticRTP, joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
@@ -146,6 +204,9 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 		}
 	}
 	if pcState.peerConnection.SignalingState() == webrtc.SignalingStateHaveLocalOffer {
+		return
+	}
+	if pcState.peerConnection.SignalingState() != webrtc.SignalingStateStable {
 		return
 	}
 	offer, err := pcState.peerConnection.CreateOffer(nil)
@@ -269,28 +330,57 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	if joinUrl == "error" {
 		return
 	}
+
 	userID := ws.Query("user_id", "error")
 	if userID == "error" {
 		return
 	}
+	role := ws.Query("role", "viewer")
+	slog.Info(role)
 	user_id, err := strconv.Atoi(userID)
 	if err != nil {
 		return
 	}
+
+	// Проверка лимита участников
+	if !r.canAddParticipant(joinUrl) && role == "streamer" {
+		log.Errorf("Room %s is full (max %d participants with camera/audio)", joinUrl, MaxActiveParticipants)
+		if err := ws.WriteJSON(map[string]interface{}{
+			"event": "error",
+			"data":  fmt.Sprintf("Room is full (max %d participants with camera/audio)", MaxActiveParticipants),
+		}); err != nil {
+			log.Errorf("Failed to send error message: %v", err)
+		}
+		return
+	}
+
+	// Инициализация комнаты
+	r.roomslock.Lock()
 	if _, ok := r.rooms[joinUrl]; !ok {
 		r.rooms[joinUrl] = &Room{
 			trackLocals:     make(map[string]*webrtc.TrackLocalStaticRTP),
 			peerConnections: make([]peerConnectionState, 0),
+			listLock:        sync.RWMutex{},
+			activeCount:     0,
 		}
 	}
+	r.roomslock.Unlock()
+
 	c := &threadSafeWriter{Conn: ws, Mutex: sync.Mutex{}, UserID: int64(user_id)}
-	defer c.Close()
+	defer func() {
+		c.Close()
+		r.updateActiveCount(joinUrl, false)
+	}()
+
+	// Создание peer connection
 	peerConnection, err := r.createPeerConnection()
 	if err != nil {
-		log.Errorf("Failed to creates a PeerConnection: %v", err)
+		log.Errorf("Failed to create PeerConnection: %v", err)
 		return
 	}
-	defer peerConnection.Close() //nolint
+	defer peerConnection.Close()
+
+	// Добавление трансиверов
 	for _, typ := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeVideo, webrtc.RTPCodecTypeAudio} {
 		if _, err := peerConnection.AddTransceiverFromKind(typ, webrtc.RTPTransceiverInit{
 			Direction: webrtc.RTPTransceiverDirectionRecvonly,
@@ -299,9 +389,17 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 			return
 		}
 	}
+
+	// Добавление соединения в комнату
 	r.rooms[joinUrl].listLock.Lock()
-	r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections, peerConnectionState{peerConnection: peerConnection, websocket: c})
+	r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections, peerConnectionState{
+		peerConnection: peerConnection,
+		websocket:      c,
+	})
 	r.rooms[joinUrl].listLock.Unlock()
+
+	// Увеличиваем счетчик активных участников
+	r.updateActiveCount(joinUrl, true)
 
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
 		if i == nil {
