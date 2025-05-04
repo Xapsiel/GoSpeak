@@ -33,6 +33,23 @@
                         <div class="input-focus-border"></div>
                     </div>
                 </div>
+
+{{/*                <div class="form-group">*/}}
+{{/*                    <label class="checkbox-label">*/}}
+{{/*                        <input type="checkbox" id="isMultiUser" name="isMultiUser">*/}}
+{{/*                        <span class="checkbox-custom"></span>*/}}
+{{/*                        <span class="checkbox-text">Несколько докладчиков</span>*/}}
+{{/*                    </label>*/}}
+{{/*                </div>*/}}
+
+{{/*                <div class="form-group" id="participantsGroup" style="display: none;">*/}}
+{{/*                    <label for="maxParticipants">Максимальное количество Докладчико</label>*/}}
+{{/*                    <div class="input-group">*/}}
+{{/*                        <span class="input-icon">👥</span>*/}}
+{{/*                        <input type="number" id="maxParticipants" name="maxParticipants" min="2" max="5" value="2">*/}}
+{{/*                        <div class="input-focus-border"></div>*/}}
+{{/*                    </div>*/}}
+{{/*                </div>*/}}
                 
                 <button type="submit" id="createConferenceButton" class="conference-button">
                     <span>Создать конференцию</span>
@@ -83,7 +100,6 @@
                 <div class="video-section">
                     <div class="video-grid grid-mode">
                         <div id="remoteVideos" class="d-flex flex-wrap gap-3">
-                            <!-- Удаленные видео будут добавлены динамически -->
                         </div>
                     </div>
                 </div>
@@ -234,6 +250,81 @@
         height: 100%;
     }
 }
+
+/* Стили для чекбокса */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+.checkbox-custom {
+    position: relative;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border: 2px solid #4a90e2;
+    border-radius: 4px;
+    margin-right: 10px;
+    transition: all 0.3s;
+}
+
+.checkbox-custom::after {
+    content: '';
+    position: absolute;
+    display: none;
+    left: 6px;
+    top: 2px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+input[type="checkbox"] {
+    display: none;
+}
+
+input[type="checkbox"]:checked + .checkbox-custom {
+    background: #4a90e2;
+}
+
+input[type="checkbox"]:checked + .checkbox-custom::after {
+    display: block;
+}
+
+.checkbox-text {
+    font-size: 1rem;
+    color: #333;
+}
+
+/* Стили для поля количества участников */
+#participantsGroup {
+    transition: all 0.3s ease;
+}
+
+#maxParticipants {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+#maxParticipants:focus {
+    border-color: #4a90e2;
+    outline: none;
+}
+
+#maxParticipants::-webkit-inner-spin-button,
+#maxParticipants::-webkit-outer-spin-button {
+    opacity: 1;
+    height: 30px;
+}
 </style>
 
 <script>
@@ -274,5 +365,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // Вызываем функцию при загрузке и при изменении размера окна
     adjustForMobile();
     window.addEventListener('resize', adjustForMobile);
+
+    // Обработчик для чекбокса типа конференции
+    const isMultiUser = document.getElementById('isMultiUser');
+    const participantsGroup = document.getElementById('participantsGroup');
+    
+    if (isMultiUser && participantsGroup) {
+        isMultiUser.addEventListener('change', function() {
+            participantsGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+
+    // Валидация формы
+    const form = document.getElementById('createConferenceForm');
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            if (isMultiUser.checked) {
+                const maxParticipants = document.getElementById('maxParticipants').value;
+                if (maxParticipants < 2 || maxParticipants > 5) {
+                    alert('Для многопользовательской конференции количество участников должно быть от 2 до 5');
+                    event.preventDefault();
+                    return;
+                }
+            }
+        });
+    }
 });
 </script>

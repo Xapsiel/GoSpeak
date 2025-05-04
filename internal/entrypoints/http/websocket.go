@@ -55,6 +55,7 @@ func (r *Router) addTrack(t *webrtc.TrackRemote, joinUrl string) *webrtc.TrackLo
 	}
 
 	r.rooms[joinUrl].trackLocals[t.ID()] = trackLocal
+	slog.Info(fmt.Sprintf("найдено %d подключений", len(r.rooms[joinUrl].trackLocals)))
 	return trackLocal
 }
 
@@ -67,9 +68,7 @@ func (r *Router) dispatchKeyFrame(joinUrl string) {
 			if receiver.Track() == nil {
 				continue
 			}
-			if receiver.Track() == nil {
-				continue
-			}
+
 			_ = r.rooms[joinUrl].peerConnections[i].peerConnection.WriteRTCP([]rtcp.Packet{
 				&rtcp.PictureLossIndication{
 					MediaSSRC: uint32(receiver.Track().SSRC()),
@@ -83,31 +82,35 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
 		r.rooms[joinUrl].listLock.Unlock()
-	}()
 
+	}()
 	if r.rooms[joinUrl].pendingSignal {
 		return
 	}
 	r.rooms[joinUrl].pendingSignal = true
+	time.AfterFunc(100*time.Millisecond, func() {
+		defer func() {
+			r.rooms[joinUrl].pendingSignal = false
+		}()
+		var wg sync.WaitGroup
+		for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
+			if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
+				r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
+				i--
+				continue
+			}
 
-	var wg sync.WaitGroup
-	for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
-		if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
-			r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
-			i--
-			continue
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				r.signalPeer(joinUrl, idx)
+			}(i)
 		}
-
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			r.signalPeer(joinUrl, idx)
-		}(i)
-	}
-
-	wg.Wait()
-	r.rooms[joinUrl].pendingSignal = false
-	r.dispatchKeyFrame(joinUrl)
+		time.AfterFunc(10*time.Millisecond, func() {
+			r.dispatchKeyFrame(joinUrl)
+		})
+		wg.Wait()
+	})
 }
 
 func (r *Router) signalPeer(joinUrl string, idx int) {
@@ -135,6 +138,7 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 			if _, err := pcState.peerConnection.AddTrack(trackLocalsCopy[trackID]); err != nil {
 				log.Errorf("Failed to add track: %v", err)
 			}
+
 		}
 	}
 
@@ -358,6 +362,10 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	r.signalPeerConnections(joinUrl)
 
 	peerConnection.OnICEConnectionStateChange(func(is webrtc.ICEConnectionState) {
+		if is.String() == webrtc.PeerConnectionStateConnected.String() {
+			r.signalPeerConnections(joinUrl)
+
+		}
 		log.Infof("ICE connection state changed: %s", is)
 	})
 	message := &websocketStreamerMessage{}

@@ -48,13 +48,13 @@ async function initLocalStream(){
             document.getElementById("remoteVideos").appendChild(card);
         }
 
-        const startButton = document.createElement('button');
-        startButton.textContent = 'Начать конференцию';
-        startButton.className = 'start-conference-button';
-        startButton.onclick = async () => {
+        // const startButton = document.createElement('button');
+        // startButton.textContent = 'Начать конференцию';
+        // startButton.className = 'start-conference-button';
+        // startButton.onclick = async () => {
             try {
                 await state.localStreamEl.play();
-                startButton.remove();
+                // startButton.remove();
                 
                 if (state.peerConnection && state.localStream) {
                     state.localStream.getTracks().forEach(track => {
@@ -64,8 +64,8 @@ async function initLocalStream(){
             } catch (err) {
                 console.error('Ошибка при воспроизведении:', err);
             }
-        };
-        document.getElementById("remoteVideos").appendChild(startButton);
+        // };
+        // document.getElementById("remoteVideos").appendChild(startButton);
         
         return true;
     } catch (error) {
@@ -133,18 +133,18 @@ function createPeerConnection(){
             return;
         }
         
-        const startButton = document.createElement('button');
-        startButton.textContent = 'Включить видео';
-        startButton.className = 'start-conference-button';
-        startButton.onclick = async () => {
-            try {
-                el.play();
-                startButton.remove();
-            } catch (err) {
-                console.error('Ошибка при воспроизведении:', err);
-            }
-        };
-        card.appendChild(startButton);
+        // const startButton = document.createElement('button');
+        // startButton.textContent = 'Включить видео';
+        // startButton.className = 'start-conference-button';
+        // startButton.onclick = async () => {
+        //     try {
+        //         el.play();
+        //         startButton.remove();
+        //     } catch (err) {
+        //         console.error('Ошибка при воспроизведении:', err);
+        //     }
+        // };
+        // card.appendChild(startButton);
         
         document.getElementById("remoteVideos").appendChild(card);
         
