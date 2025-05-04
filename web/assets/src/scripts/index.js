@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             try {
                 await axiosInstance.post("/auth/logout");
                 logout();
-                updateAuthUI(false); // Обновляем UI после выхода
+                updateAuthUI(false);
             } catch (error) {
                 console.error("Ошибка при выходе:", error);
             }

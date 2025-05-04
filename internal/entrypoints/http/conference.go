@@ -16,14 +16,19 @@ type ConferenceResponse struct {
 func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 
 	joinUrl := c.Query("join_url")
+	role := c.Query("role")
+	if role != "viewer" && role != "streamer" {
+		role = "viewer"
+	}
 	conf, err := r.service.Conference.GetConference(joinUrl)
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "Неверный формат данных")
 
 	}
 	u := c.Locals("user_id").(int64)
-
-	//r.closeExistingConnections(u)
+	if !(role == "streamer" && r.canAddParticipant(joinUrl)) {
+		role = "viewer"
+	}
 
 	err = r.service.Participant.AddToConference(u, conf.ConferenceID)
 	if err != nil {
@@ -34,8 +39,9 @@ func (r *Router) JoinConferenceHandler(c *fiber.Ctx) error {
 		"conference_id": conf.ConferenceID,
 		"description":   conf.Description,
 		"title":         conf.Title,
-		"creater_id":    conf.CreatorID,
+		"creator_id":    conf.CreatorID,
 		"join_url":      joinUrl,
+		"role":          role,
 	})
 
 }

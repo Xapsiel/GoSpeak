@@ -64,7 +64,7 @@ func (r *Router) JWTMiddleware(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusUnauthorized, "Missing token")
 	}
 
-	u, err := r.service.User.ParseJWT(tokenStr) // Преобразуем в строку
+	u, err := r.service.User.ParseJWT(tokenStr)
 	if err != nil {
 		return fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
 	}

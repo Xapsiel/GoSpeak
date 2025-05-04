@@ -250,7 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
             headerNav.classList.toggle('active');
         });
         
-        // Закрываем меню при клике вне его
         document.addEventListener('click', function(event) {
             const isClickInside = headerNav.contains(event.target) || mobileMenuToggle.contains(event.target);
             

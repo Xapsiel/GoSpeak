@@ -325,7 +325,6 @@ input[type="checkbox"]:checked + .checkbox-custom::after {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Обработчик для кнопки переключения чата
     const chatToggle = document.getElementById('chatToggle');
     const chatSection = document.getElementById('chatSection');
     
@@ -335,7 +334,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Обработчик для кнопки переключения чата в панели управления
     const toggleChatBtn = document.getElementById('toggleChat');
     
     if (toggleChatBtn && chatSection) {
@@ -344,25 +342,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Адаптация для мобильных устройств
     function adjustForMobile() {
         const isMobile = window.innerWidth <= 768;
         const chatSection = document.getElementById('chatSection');
         
         if (isMobile && chatSection) {
-            // На мобильных устройствах чат по умолчанию свернут
             chatSection.classList.add('collapsed');
         } else if (chatSection) {
-            // На десктопах чат по умолчанию развернут
             chatSection.classList.remove('collapsed');
         }
     }
     
-    // Вызываем функцию при загрузке и при изменении размера окна
     adjustForMobile();
     window.addEventListener('resize', adjustForMobile);
 
-    // Обработчик для чекбокса типа конференции
     const isMultiUser = document.getElementById('isMultiUser');
     const participantsGroup = document.getElementById('participantsGroup');
     
@@ -372,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Валидация формы
     const form = document.getElementById('createConferenceForm');
     if (form) {
         form.addEventListener('submit', function(event) {

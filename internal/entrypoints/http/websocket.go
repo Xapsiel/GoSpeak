@@ -59,7 +59,6 @@ func (r *Router) canAddParticipant(joinUrl string) bool {
 	return activeParticipants < MaxActiveParticipants
 }
 
-// Функция обновления счетчика активных участников
 func (r *Router) updateActiveCount(joinUrl string, increment bool) {
 	room, ok := r.rooms[joinUrl]
 	if !ok {
@@ -69,7 +68,6 @@ func (r *Router) updateActiveCount(joinUrl string, increment bool) {
 	room.listLock.Lock()
 	defer room.listLock.Unlock()
 
-	// Пересчитываем количество активных участников
 	activeParticipants := 0
 	for _, pc := range room.peerConnections {
 		hasActiveTracks := false
@@ -342,7 +340,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 		return
 	}
 
-	// Проверка лимита участников
 	if !r.canAddParticipant(joinUrl) && role == "streamer" {
 		log.Errorf("Room %s is full (max %d participants with camera/audio)", joinUrl, MaxActiveParticipants)
 		if err := ws.WriteJSON(map[string]interface{}{
@@ -354,7 +351,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 		return
 	}
 
-	// Инициализация комнаты
 	r.roomslock.Lock()
 	if _, ok := r.rooms[joinUrl]; !ok {
 		r.rooms[joinUrl] = &Room{
@@ -372,7 +368,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 		r.updateActiveCount(joinUrl, false)
 	}()
 
-	// Создание peer connection
 	peerConnection, err := r.createPeerConnection()
 	if err != nil {
 		log.Errorf("Failed to create PeerConnection: %v", err)
@@ -380,7 +375,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	}
 	defer peerConnection.Close()
 
-	// Добавление трансиверов
 	for _, typ := range []webrtc.RTPCodecType{webrtc.RTPCodecTypeVideo, webrtc.RTPCodecTypeAudio} {
 		if _, err := peerConnection.AddTransceiverFromKind(typ, webrtc.RTPTransceiverInit{
 			Direction: webrtc.RTPTransceiverDirectionRecvonly,
@@ -390,7 +384,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 		}
 	}
 
-	// Добавление соединения в комнату
 	r.rooms[joinUrl].listLock.Lock()
 	r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections, peerConnectionState{
 		peerConnection: peerConnection,
@@ -398,7 +391,6 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	})
 	r.rooms[joinUrl].listLock.Unlock()
 
-	// Увеличиваем счетчик активных участников
 	r.updateActiveCount(joinUrl, true)
 
 	peerConnection.OnICECandidate(func(i *webrtc.ICECandidate) {
@@ -427,7 +419,7 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 			if err := peerConnection.Close(); err != nil {
 				log.Errorf("Failed to close PeerConnection: %v", err)
 			}
-		case webrtc.PeerConnectionStateClosed:
+		case webrtc.PeerConnectionStateClosed, webrtc.PeerConnectionStateConnected:
 			r.signalPeerConnections(joinUrl)
 		default:
 		}

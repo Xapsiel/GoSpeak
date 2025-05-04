@@ -34,6 +34,11 @@ let isAudioEnabled = true;
 
 async function initLocalStream(){
     try {
+        if (auth.role==="viewer"){
+            let er =new Error("Пользователь является зрителем")
+            er.name = "NotAllowedError"
+            throw er
+        }
         state.localStream = await navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true
@@ -49,11 +54,9 @@ async function initLocalStream(){
             let card = createCard(state.localStreamEl)
             document.getElementById("remoteVideos").appendChild(card);
         }
-
-
             try {
                 await state.localStreamEl.play();
-                // startButton.remove();
+                state.localStreamEl.muted = false;
                 
                 if (state.peerConnection && state.localStream) {
                     state.localStream.getTracks().forEach(track => {
@@ -100,13 +103,73 @@ function createCard(video){
         card.classList.toggle('expanded');
     });
     card.style.minWidth = '240px';
+    
     let card_video_container = document.createElement('div');
     card_video_container.className='card-video-container';
     card_video_container.style.padding = '0px';
     video.className='w-100 h-100 object-fit-cover'
 
+    const isLocalVideo = video === state.localStreamEl;
+
+    if (!isLocalVideo) {
+        let controlsContainer = document.createElement('div');
+        controlsContainer.className = 'video-controls';
+        controlsContainer.style.position = 'absolute';
+        controlsContainer.style.bottom = '10px';
+        controlsContainer.style.left = '10px';
+        controlsContainer.style.right = '10px';
+        controlsContainer.style.display = 'flex';
+        controlsContainer.style.gap = '10px';
+        controlsContainer.style.opacity = '0';
+        controlsContainer.style.transition = 'opacity 0.3s ease';
+        controlsContainer.style.zIndex = '2';
+
+        let volumeSlider = document.createElement('input');
+        volumeSlider.type = 'range';
+        volumeSlider.min = '0';
+        volumeSlider.max = '100';
+        volumeSlider.value = '100';
+        volumeSlider.className = 'volume-slider';
+        volumeSlider.style.flex = '1';
+        volumeSlider.addEventListener('input', (e) => {
+            if (video.volume !== undefined) {
+                video.volume = e.target.value / 100;
+            }
+        });
+
+        let videoToggle = document.createElement('button');
+        videoToggle.className = 'control-button small';
+        videoToggle.innerHTML = `
+            <svg class="control-icon" viewBox="0 0 24 24">
+                <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+            </svg>
+        `;
+        videoToggle.addEventListener('click', () => {
+            if (video.srcObject) {
+                const tracks = video.srcObject.getVideoTracks();
+                tracks.forEach(track => {
+                    track.enabled = !track.enabled;
+                });
+                videoToggle.classList.toggle('active', tracks[0].enabled);
+            }
+        });
+
+        controlsContainer.appendChild(volumeSlider);
+        controlsContainer.appendChild(videoToggle);
+        card_video_container.appendChild(controlsContainer);
+
+        card_video_container.addEventListener('mouseenter', () => {
+            controlsContainer.style.opacity = '1';
+        });
+
+        card_video_container.addEventListener('mouseleave', () => {
+            controlsContainer.style.opacity = '0';
+        });
+    }
+
     card_video_container.appendChild(video);
     card.appendChild(card_video_container);
+
     return card
 }
 function createPeerConnection(){
@@ -158,21 +221,20 @@ function createPeerConnection(){
         state.streamWS.send(JSON.stringify({event: 'candidate', data: JSON.stringify(e.candidate)}));
     }
 }
-async function setupStreamWebSocket(joinUrl){
+async function setupStreamWebSocket(){
     try{
-        await initLocalStream();
+            await initLocalStream();
+
     }catch (error){
         state.isViewer=true;
         console.log(error)
     }
     await createPeerConnection();
 
-    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${joinUrl}&user_id=${auth.user.user_id}&role=${state.isViewer ? "viewer" : "streamer"}`);
+    state.streamWS = new WebSocket(`ws://${domain}/ws/stream?join_url=${conference.join_url}&user_id=${auth.user.user_id}&role=${auth.role}`);
     state.streamWS.onclose  = function(event){
-        // window.location.href = '/';
     }
     state.streamWS.onerror=function (event){
-        // window.location.href = '/';
     }
     state.streamWS.onopen = function() {
         state.streamWS.send(JSON.stringify({
@@ -189,7 +251,6 @@ async function setupStreamWebSocket(joinUrl){
         }
         switch (msg.event){
             case "error":
-                // Показываем сообщение об ошибке
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'alert alert-warning';
                 errorDiv.innerHTML = `
@@ -202,12 +263,10 @@ async function setupStreamWebSocket(joinUrl){
                 `;
                 document.getElementById('conferenceSection').prepend(errorDiv);
                 
-                // Отключаем кнопки управления
                 if (toggleVideo) toggleVideo.disabled = true;
                 if (toggleAudio) toggleAudio.disabled = true;
                 if (endCallButton) endCallButton.disabled = true;
                 
-                // Показываем сообщение о том, что пользователь может присоединиться только для просмотра
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'alert alert-info mt-2';
                 infoDiv.innerHTML = `
@@ -274,13 +333,12 @@ function handleNewMessage(from, content ) {
     chatMessages.appendChild(message);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-async function setupChatWebSocket(joinUrl){
-    state.chatWS = new WebSocket(`ws://${domain}/ws/chat?join_url=${joinUrl}`);
+async function setupChatWebSocket(){
+    state.chatWS = new WebSocket(`ws://${domain}/ws/chat?join_url=${conference.join_url}`);
     state.chatWS.onopen = async ()=>{
         sendChatWSMessage({event:"join", conference_id: conference.id, from: auth.user.user_id,})
     }
     state.chatWS.onclose  = function(event){
-        // window.location.href = '/';
 
     }
     state.chatWS.onerror = function(event){
@@ -305,10 +363,9 @@ async function setupChatWebSocket(joinUrl){
 }
 function  setupWebSocket(){
     const params = new URLSearchParams(window.location.search);
-    const joinUrl = params.get('join_url');
-    setupStreamWebSocket(joinUrl);
+    setupStreamWebSocket();
 
-    setupChatWebSocket(joinUrl);
+    setupChatWebSocket();
 
 }
 
@@ -353,6 +410,8 @@ const axiosInstance = axios.create({
 const auth = {
     token: window.localStorage.getItem("jwtToken"),
     user: JSON.parse(window.localStorage.getItem("user") || null),
+    role:"viewer",
+
 };
 
 const conference = {
@@ -362,6 +421,7 @@ const conference = {
     title: "",
     participants: new Map(),
     description:"",
+
 };
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -369,21 +429,23 @@ const urlParams = new URLSearchParams(window.location.search);
 document.addEventListener('DOMContentLoaded', () => {
 
     const joinUrl = urlParams.get("join_url");
+    const role = urlParams.get("role")
     const createSection = document.getElementById("createConference");
     const conferenceSection = document.getElementById("conferenceSection");
 
     initializeUser().then(() => {
         if (joinUrl) {
-            axiosInstance.get(`/conference/join?join_url=${joinUrl}`, {
+            axiosInstance.get(`/conference/join?join_url=${joinUrl}&role=${role}`, {
                 headers: { Authorization: `Bearer ${auth.token}` }
             }).then(response => {
                 if (response.data) {
                     conferenceSection?.classList.remove("d-none");
                     conference.id = response.data.conference_id;
-                    conference.creater_id = response.data.creater_id;
+                    conference.creater_id = response.data.creator_id;
                     conference.join_url = response.data.join_url;
                     conference.description = response.data.description;
                     conference.title = response.data.title
+                    auth.role = response.data.role
                     initConference();
                 }
             }).catch(error => {
@@ -407,6 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (response.data?.join_url) {
                         const newUrl = new URL(window.location.href);
                         newUrl.searchParams.set('join_url', response.data.join_url);
+                        newUrl.searchParams.set('role', "streamer");
                         window.location.href = newUrl.toString();
                     } else {
 
@@ -546,12 +609,6 @@ async function initConference() {
 
 }
 
-function cleanup() {
-    state.peerConnection?.close();
-    state.streamWS?.close();
-    state.localStream?.getTracks().forEach(track => track.stop());
-    state.remoteStreams.forEach(stream => stream.getTracks().forEach(track => track.stop()));
-}
 
 window.addEventListener('beforeunload', () => {
 });
@@ -567,60 +624,5 @@ chatSection.addEventListener('mouseleave', () => {
     videoSection.classList.remove('chat-open');
 });
 
-// Функция подключения к конференции
-async function connectToConference() {
-    try {
-        // Проверяем наличие камеры и микрофона
-        const hasVideo = await checkMediaAccess('video');
-        const hasAudio = await checkMediaAccess('audio');
 
-        // Если нет ни камеры, ни микрофона, подключаемся в режиме просмотра
-        if (!hasVideo && !hasAudio) {
-            state.isViewer = true;
-            state.streamWS.send(JSON.stringify({
-                event: "join",
-                data: {
-                    joinUrl: state.joinUrl,
-                    isViewer: true
-                }
-            }));
-            return;
-        }
 
-        // Если есть камера или микрофон, запрашиваем разрешение
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: hasVideo,
-            audio: hasAudio
-        });
-
-        // Подключаемся к конференции
-        state.streamWS.send(JSON.stringify({
-            event: "join",
-            data: {
-                joinUrl: state.joinUrl,
-                isViewer: false
-            }
-        }));
-
-        // Сохраняем поток
-        state.localStream = stream;
-        
-        // Обновляем UI
-        updateMediaControls(hasVideo, hasAudio);
-        
-    } catch (error) {
-        console.error("Ошибка при подключении:", error);
-        showError("Не удалось подключиться к конференции");
-    }
-}
-
-// Функция проверки доступа к медиаустройствам
-async function checkMediaAccess(type) {
-    try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.some(device => device.kind === `${type}input`);
-    } catch (error) {
-        console.error(`Ошибка при проверке ${type}:`, error);
-        return false;
-    }
-}
