@@ -48,10 +48,7 @@ async function initLocalStream(){
             document.getElementById("remoteVideos").appendChild(card);
         }
 
-        // const startButton = document.createElement('button');
-        // startButton.textContent = 'Начать конференцию';
-        // startButton.className = 'start-conference-button';
-        // startButton.onclick = async () => {
+
             try {
                 await state.localStreamEl.play();
                 // startButton.remove();
@@ -64,9 +61,7 @@ async function initLocalStream(){
             } catch (err) {
                 console.error('Ошибка при воспроизведении:', err);
             }
-        // };
-        // document.getElementById("remoteVideos").appendChild(startButton);
-        
+
         return true;
     } catch (error) {
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
@@ -133,19 +128,7 @@ function createPeerConnection(){
             return;
         }
         
-        // const startButton = document.createElement('button');
-        // startButton.textContent = 'Включить видео';
-        // startButton.className = 'start-conference-button';
-        // startButton.onclick = async () => {
-        //     try {
-        //         el.play();
-        //         startButton.remove();
-        //     } catch (err) {
-        //         console.error('Ошибка при воспроизведении:', err);
-        //     }
-        // };
-        // card.appendChild(startButton);
-        
+
         document.getElementById("remoteVideos").appendChild(card);
         
         event.track.onmute = function (event){}

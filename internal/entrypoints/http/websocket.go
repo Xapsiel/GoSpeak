@@ -81,6 +81,8 @@ func (r *Router) dispatchKeyFrame(joinUrl string) {
 func (r *Router) signalPeerConnections(joinUrl string) {
 	r.rooms[joinUrl].listLock.Lock()
 	defer func() {
+		r.rooms[joinUrl].pendingSignal = false
+
 		r.rooms[joinUrl].listLock.Unlock()
 
 	}()
@@ -89,10 +91,8 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 	}
 	r.rooms[joinUrl].pendingSignal = true
 	time.AfterFunc(100*time.Millisecond, func() {
-		defer func() {
-			r.rooms[joinUrl].pendingSignal = false
-		}()
 		var wg sync.WaitGroup
+		r.roomslock.Lock()
 		for i := 0; i < len(r.rooms[joinUrl].peerConnections); i++ {
 			if r.rooms[joinUrl].peerConnections[i].peerConnection.ConnectionState() == webrtc.PeerConnectionStateClosed {
 				r.rooms[joinUrl].peerConnections = append(r.rooms[joinUrl].peerConnections[:i], r.rooms[joinUrl].peerConnections[i+1:]...)
@@ -106,6 +106,8 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 				r.signalPeer(joinUrl, idx)
 			}(i)
 		}
+		r.roomslock.Unlock()
+
 		time.AfterFunc(10*time.Millisecond, func() {
 			r.dispatchKeyFrame(joinUrl)
 		})
@@ -114,8 +116,10 @@ func (r *Router) signalPeerConnections(joinUrl string) {
 }
 
 func (r *Router) signalPeer(joinUrl string, idx int) {
-	pcState := r.rooms[joinUrl].peerConnections[idx]
+	r.roomslock.Lock()
 	r.rooms[joinUrl].listLock.Lock()
+	pcState := r.rooms[joinUrl].peerConnections[idx]
+	r.roomslock.Unlock()
 	existingSenders := make(map[string]bool)
 	for _, sender := range pcState.peerConnection.GetSenders() {
 		if sender.Track() != nil {
@@ -141,7 +145,9 @@ func (r *Router) signalPeer(joinUrl string, idx int) {
 
 		}
 	}
-
+	if pcState.peerConnection.SignalingState() == webrtc.SignalingStateHaveLocalOffer {
+		return
+	}
 	offer, err := pcState.peerConnection.CreateOffer(nil)
 	if err != nil {
 		log.Errorf("Failed to create offer: %v", err)
