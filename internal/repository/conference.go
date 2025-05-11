@@ -33,9 +33,9 @@ func NewConferenceRepository(db *sqlx.DB) *ConferenceRepository {
 func (r *ConferenceRepository) CreateConference(c *model.Conference) error {
 	query := `
 			INSERT INTO 
-			    conferences(title, description, creater_id, status, join_url, password)
+			    conferences(title, description, creator_id, status, join_url, password)
 			VALUES ($1, $2, $3, $4,$5,$6)
-			ON CONFLICT (title, description,creater_id) DO NOTHING 
+			ON CONFLICT (title, description,creator_id) DO NOTHING 
 			`
 	_, err := r.db.Exec(query, c.Title, c.Description, c.CreatorID, "live", c.JoinURL, c.Password)
 	if err != nil {
@@ -50,7 +50,7 @@ func (r *ConferenceRepository) GetConference(join_url string) (*model.Conference
 			    conference_id,
 			    title,
 			    description,
-			    creater_id,
+			    creator_id,
 			    status,
 			    join_url
 			from conferences

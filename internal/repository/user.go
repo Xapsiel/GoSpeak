@@ -58,7 +58,7 @@ func (r *UserRepository) SignIn(email string, password string) (*model.User, err
 	var u model.User
 	if err := row.Scan(&u.UserID, &u.Email, &u.FullName, &u.AvatarURL, &u.IsOnline); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, err
 		}
 		return nil, err
 	}

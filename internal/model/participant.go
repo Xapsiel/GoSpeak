@@ -9,6 +9,4 @@ type Participant struct {
 	Role          string    `json:"role"`
 	JoinedAt      time.Time `json:"joined_at"`
 	LeftAt        time.Time `json:"left_at"`
-	VideoEnabled  bool      `json:"video_enabled"`
-	AudioEnabled  bool      `json:"audio_enabled"`
 }

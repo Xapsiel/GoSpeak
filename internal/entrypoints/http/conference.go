@@ -58,7 +58,7 @@ func (r *Router) CreateConferenceHandler(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{
 		"join_url":   conf.JoinURL,
-		"creater_id": conf.CreatorID,
+		"creator_id": conf.CreatorID,
 	})
 }
 

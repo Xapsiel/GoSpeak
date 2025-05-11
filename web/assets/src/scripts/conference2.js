@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (response.data) {
                     conferenceSection?.classList.remove("d-none");
                     conference.id = response.data.conference_id;
-                    conference.creater_id = response.data.creater_id;
+                    conference.creator_id = response.data.creator_id;
                     conference.join_url = response.data.join_url;
                     initConference();
                 }
