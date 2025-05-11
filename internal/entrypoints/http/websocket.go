@@ -19,11 +19,25 @@ import (
 
 var Config = webrtc.Configuration{
 	ICEServers: []webrtc.ICEServer{
-		webrtc.ICEServer{
-			URLs: []string{"stun:stun.l.google.com:19302"},
+		{
+			URLs: []string{
+				"stun:stun.l.google.com:19302",
+				"stun:global.stun.twilio.com:3478",
+			},
+		},
+		{
+			URLs: []string{
+				"turn:relay1.expressturn.com:3478?transport=udp",
+				"turn:relay1.expressturn.com:3478?transport=tcp",
+				"turns:relay1.expressturn.com:5349?transport=tcp",
+			},
+			Username:   "ef47B9MOBBMFPVPIJO",
+			Credential: "9BZOLQ3r6Lxa9qTL",
 		},
 	},
+	SDPSemantics: webrtc.SDPSemanticsUnifiedPlan,
 }
+
 var rtpBufferPool = sync.Pool{
 	New: func() interface{} {
 		return make([]byte, 1450)
@@ -316,12 +330,7 @@ func (r *Router) createPeerConnection() (*webrtc.PeerConnection, error) {
 	}
 
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(&m))
-	return api.NewPeerConnection(webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{webrtc.ICEServer{
-			URLs: []string{"stun:stun.l.google.com:19302"},
-		}},
-		SDPSemantics: webrtc.SDPSemanticsUnifiedPlan,
-	})
+	return api.NewPeerConnection(Config)
 }
 func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 	joinUrl := ws.Query("join_url", "error")
@@ -435,21 +444,24 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 
 		buf := rtpBufferPool.Get().([]byte)
 		defer rtpBufferPool.Put(buf)
-		rtpPkt := &rtp.Packet{}
-
+		pkt := &rtp.Packet{}
+		var err error
 		for {
-			i, _, err := t.Read(buf)
+			//i, _, err := t.Read(buf)
+			//if err != nil {
+			//	log.Infof("Track reading stopped: %v", err)
+			//	return
+			//}
+			//
+			//if err = rtpPkt.Unmarshal(buf[:i]); err != nil {
+			//	log.Errorf("Failed to unmarshal RTP: %v", err)
+			//	continue
+			//}
+			pkt, _, err = t.ReadRTP()
 			if err != nil {
-				log.Infof("Track reading stopped: %v", err)
-				return
-			}
 
-			if err = rtpPkt.Unmarshal(buf[:i]); err != nil {
-				log.Errorf("Failed to unmarshal RTP: %v", err)
-				continue
 			}
-
-			if err = trackLocal.WriteRTP(rtpPkt); err != nil {
+			if err = trackLocal.WriteRTP(pkt); err != nil {
 				log.Infof("Track writing stopped: %v", err)
 				return
 			}

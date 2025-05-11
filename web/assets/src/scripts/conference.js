@@ -19,9 +19,18 @@ const configuration = {
         {
             urls: [
                 "stun:stun.l.google.com:19302",
+                "stun:global.stun.twilio.com:3478"
             ]
         },
-
+        {
+            urls: [
+                "turn:relay1.expressturn.com:3478?transport=udp",
+                "turn:relay1.expressturn.com:3478?transport=tcp",
+                "turns:relay1.expressturn.com:5349?transport=tcp"
+            ],
+            username: "ef47B9MOBBMFPVPIJO",
+            credential: "9BZOLQ3r6Lxa9qTL"
+        }
     ]
 };
 
