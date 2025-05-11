@@ -444,24 +444,19 @@ func (r *Router) WebSocketStreamerHandler(ws *websocket.Conn) {
 
 		buf := rtpBufferPool.Get().([]byte)
 		defer rtpBufferPool.Put(buf)
-		pkt := &rtp.Packet{}
-		var err error
+		rtpPkt := &rtp.Packet{}
 		for {
-			//i, _, err := t.Read(buf)
-			//if err != nil {
-			//	log.Infof("Track reading stopped: %v", err)
-			//	return
-			//}
-			//
-			//if err = rtpPkt.Unmarshal(buf[:i]); err != nil {
-			//	log.Errorf("Failed to unmarshal RTP: %v", err)
-			//	continue
-			//}
-			pkt, _, err = t.ReadRTP()
+			i, _, err := t.Read(buf)
 			if err != nil {
-
+				log.Infof("Track reading stopped: %v", err)
+				return
 			}
-			if err = trackLocal.WriteRTP(pkt); err != nil {
+
+			if err = rtpPkt.Unmarshal(buf[:i]); err != nil {
+				log.Errorf("Failed to unmarshal RTP: %v", err)
+				continue
+			}
+			if err = trackLocal.WriteRTP(rtpPkt); err != nil {
 				log.Infof("Track writing stopped: %v", err)
 				return
 			}
