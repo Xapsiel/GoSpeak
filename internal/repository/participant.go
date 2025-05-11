@@ -55,7 +55,7 @@ func (r *ParticipantRepository) AddToConference(u int64, conf string) error {
 		    SET role = EXCLUDED.role, joined_at = EXCLUDED.joined_at, 
 		        conference_id = EXCLUDED.conference_id, user_id = EXCLUDED.user_id;
 			`
-	role := "participant"
+	role := "viewer"
 	_, err := r.db.Exec(query, conf, u, role, time.Now())
 	if err != nil {
 		return err

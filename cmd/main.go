@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log/slog"
+	httpl "net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"GoSpeak/internal/config"
@@ -15,6 +17,9 @@ import (
 )
 
 func main() {
+	go func() {
+		httpl.ListenAndServe("localhost:6060", nil)
+	}()
 	configPath := flag.String("c", "config/config.yaml", "The path to the config file")
 	flag.Parse()
 	config, err := config.New(*configPath)
