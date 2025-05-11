@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS users
     is_online BOOLEAN DEFAULT FALSE
 );
 CREATE  TYPE   STATUS_ENUM as ENUM('scheduled', 'live', 'ended')  ;
-CREATE  TYPE ROLE_ENUM as ENUM('host', 'moderator', 'participant');
+CREATE  TYPE ROLE_ENUM as ENUM('host', 'streamer', 'viewer');
 CREATE  TYPE CONTENT_TYPE AS ENUM('text','file','link') ;
